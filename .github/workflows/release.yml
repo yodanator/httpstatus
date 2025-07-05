@@ -93,7 +93,10 @@ jobs:
         OS=${{ matrix.platform.os }}
         ARCH=${{ matrix.platform.arch }}
         GOARM=${{ matrix.platform.goarm || '' }}
-        SUFFIX=${{ matrix.platform.suffix || $ARCH }}
+        SUFFIX="${{ matrix.platform.suffix }}"
+        if [ -z "$SUFFIX" ]; then
+          SUFFIX="$ARCH"
+        fi
         
         ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
         
