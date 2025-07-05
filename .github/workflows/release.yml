@@ -23,11 +23,11 @@ jobs:
             goarm: 6
             suffix: v6
           - os: linux
-            arch: arm64
-          - os: linux
             arch: arm
             goarm: 7
             suffix: v7
+          - os: linux
+            arch: arm64
           - os: windows
             arch: amd64
           - os: windows
@@ -64,8 +64,8 @@ jobs:
           BINARY_NAME="$BINARY_NAME.exe"
         fi
         
-        # Build with optimizations
-        build_flags="-ldflags='-s -w' -trimpath"
+        # Inject version and repo URL during build
+        build_flags="-ldflags='-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w' -trimpath"
         CGO_ENABLED=0 go build $build_flags -o "$OUTPUT_DIR/$BINARY_NAME"
         
         # Skip UPX for unsupported platforms
