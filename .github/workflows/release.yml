@@ -7,6 +7,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         platform:
@@ -40,6 +47,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get full history
+        ref: ${{ github.ref }} 
       
     - name: Set up Go
       uses: actions/setup-go@v4
