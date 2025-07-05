@@ -1,0 +1,151 @@
+name: Release Build
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: 386
+          - os: linux
+            arch: arm
+            goarm: 6
+            suffix: v6
+          - os: linux
+            arch: arm64
+          - os: linux
+            arch: arm
+            goarm: 7
+            suffix: v7
+          - os: windows
+            arch: amd64
+          - os: windows
+            arch: 386
+          - os: windows
+            arch: arm64
+          - os: freebsd
+            arch: amd64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+        
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y upx
+        
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.platform.os }}
+        GOARCH: ${{ matrix.platform.arch }}
+        GOARM: ${{ matrix.platform.goarm || '' }}
+      run: |
+        OUTPUT_DIR="dist"
+        mkdir -p $OUTPUT_DIR
+        BINARY_NAME="httpstatus"
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="$BINARY_NAME.exe"
+        fi
+        
+        # Build with optimizations
+        build_flags="-ldflags='-s -w' -trimpath"
+        CGO_ENABLED=0 go build $build_flags -o "$OUTPUT_DIR/$BINARY_NAME"
+        
+        # Skip UPX for unsupported platforms
+        if [[ "$GOOS" == "darwin" || 
+              ("$GOOS" == "windows" && "$GOARCH" == "arm64") || 
+              "$GOOS" == "freebsd" ]]; then
+          echo "Skipping UPX for $GOOS/$GOARCH"
+        else
+          upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
+        fi
+        
+    - name: Package release
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        OS=${{ matrix.platform.os }}
+        ARCH=${{ matrix.platform.arch }}
+        GOARM=${{ matrix.platform.goarm || '' }}
+        SUFFIX=${{ matrix.platform.suffix || $ARCH }}
+        
+        ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
+        
+        cd dist
+        if [ "$OS" = "windows" ]; then
+          zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
+        else
+          tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
+        fi
+        # Cleanup
+        rm -f *
+        cd ..
+        mkdir -p artifacts
+        mv "$ARCHIVE_NAME".* artifacts/
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: httpstatus-binaries
+        path: artifacts
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: httpstatus-binaries
+        path: dist-binaries
+        
+    - name: Prepare release assets
+      run: |
+        # Combine all binaries into single directory
+        mkdir -p release-assets
+        mv dist-binaries/*/* release-assets/
+        
+        # Generate checksums
+        cd release-assets
+        sha256sum * > SHA256SUMS
+        cd ..
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref }}
+        name: Release ${{ github.ref_name }}
+        files: |
+          release-assets/*
+        body: |
+          Pre-built binaries for HTTP Status CLI v${{ github.ref_name }}
+          
+          ### Verification
+          Verify the integrity of downloaded files with:
+          ```
+          sha256sum -c SHA256SUMS
+          ```
+          
+          ### Supported Platforms
+          - macOS (Intel and Apple Silicon)
+          - Linux (x86, amd64, ARMv6, ARMv7, ARM64)
+          - Windows (x86, amd64, ARM64)
+          - FreeBSD (amd64)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

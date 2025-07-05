@@ -1,0 +1,374 @@
+[
+  {
+    "code": 100,
+    "type": "Informational",
+    "short": "Continue",
+    "long": "The server has received the request headers and the client should proceed to send the request body."
+  },
+  {
+    "code": 101,
+    "type": "Informational",
+    "short": "Switching Protocols",
+    "long": "The server is switching protocols as requested by the client."
+  },
+  {
+    "code": 102,
+    "type": "Informational",
+    "short": "Processing",
+    "long": "The server has received and is processing the request, but no response is available yet."
+  },
+  {
+    "code": 103,
+    "type": "Informational",
+    "short": "Early Hints",
+    "long": "Used to return some response headers before final HTTP message."
+  },
+  {
+    "code": 200,
+    "type": "Success",
+    "short": "OK",
+    "long": "Standard response for successful HTTP requests."
+  },
+  {
+    "code": 201,
+    "type": "Success",
+    "short": "Created",
+    "long": "The request has been fulfilled, resulting in the creation of a new resource."
+  },
+  {
+    "code": 202,
+    "type": "Success",
+    "short": "Accepted",
+    "long": "The request has been accepted for processing, but processing has not been completed."
+  },
+  {
+    "code": 203,
+    "type": "Success",
+    "short": "Non-Authoritative Information",
+    "long": "The server is a transforming proxy that received a 200 OK from its origin."
+  },
+  {
+    "code": 204,
+    "type": "Success",
+    "short": "No Content",
+    "long": "The server successfully processed the request and is not returning any content."
+  },
+  {
+    "code": 205,
+    "type": "Success",
+    "short": "Reset Content",
+    "long": "The server successfully processed the request, asks that the requester reset its document view."
+  },
+  {
+    "code": 206,
+    "type": "Success",
+    "short": "Partial Content",
+    "long": "The server is delivering only part of the resource due to a range header sent by the client."
+  },
+  {
+    "code": 207,
+    "type": "Success",
+    "short": "Multi-Status",
+    "long": "The message body that follows is an XML message and can contain multiple response codes."
+  },
+  {
+    "code": 208,
+    "type": "Success",
+    "short": "Already Reported",
+    "long": "The members of a DAV binding have already been enumerated in a previous reply."
+  },
+  {
+    "code": 226,
+    "type": "Success",
+    "short": "IM Used",
+    "long": "The server has fulfilled a request for the resource, and the response is a representation of the result of one or more instance-manipulations applied to the current instance."
+  },
+  {
+    "code": 300,
+    "type": "Redirection",
+    "short": "Multiple Choices",
+    "long": "Indicates multiple options for the resource that the client may follow."
+  },
+  {
+    "code": 301,
+    "type": "Redirection",
+    "short": "Moved Permanently",
+    "long": "This and all future requests should be directed to the given URI."
+  },
+  {
+    "code": 302,
+    "type": "Redirection",
+    "short": "Found",
+    "long": "Tells the client to look at (browse to) another URL."
+  },
+  {
+    "code": 303,
+    "type": "Redirection",
+    "short": "See Other",
+    "long": "The response to the request can be found under another URI using the GET method."
+  },
+  {
+    "code": 304,
+    "type": "Redirection",
+    "short": "Not Modified",
+    "long": "Indicates that the resource has not been modified since the version specified by the request headers."
+  },
+  {
+    "code": 305,
+    "type": "Redirection",
+    "short": "Use Proxy",
+    "long": "The requested resource is available only through a proxy."
+  },
+  {
+    "code": 307,
+    "type": "Redirection",
+    "short": "Temporary Redirect",
+    "long": "The request should be repeated with another URI."
+  },
+  {
+    "code": 308,
+    "type": "Redirection",
+    "short": "Permanent Redirect",
+    "long": "The request and all future requests should be repeated using another URI."
+  },
+  {
+    "code": 400,
+    "type": "Client Error",
+    "short": "Bad Request",
+    "long": "The server cannot or will not process the request due to an apparent client error."
+  },
+  {
+    "code": 401,
+    "type": "Client Error",
+    "short": "Unauthorized",
+    "long": "Authentication is required and has failed or has not yet been provided."
+  },
+  {
+    "code": 402,
+    "type": "Client Error",
+    "short": "Payment Required",
+    "long": "Reserved for future use."
+  },
+  {
+    "code": 403,
+    "type": "Client Error",
+    "short": "Forbidden",
+    "long": "The request was valid, but the server is refusing action."
+  },
+  {
+    "code": 404,
+    "type": "Client Error",
+    "short": "Not Found",
+    "long": "The requested resource could not be found but may be available in the future."
+  },
+  {
+    "code": 405,
+    "type": "Client Error",
+    "short": "Method Not Allowed",
+    "long": "A request method is not supported for the requested resource."
+  },
+  {
+    "code": 406,
+    "type": "Client Error",
+    "short": "Not Acceptable",
+    "long": "The requested resource is capable of generating only content not acceptable according to the Accept headers sent in the request."
+  },
+  {
+    "code": 407,
+    "type": "Client Error",
+    "short": "Proxy Authentication Required",
+    "long": "The client must first authenticate itself with the proxy."
+  },
+  {
+    "code": 408,
+    "type": "Client Error",
+    "short": "Request Timeout",
+    "long": "The server timed out waiting for the request."
+  },
+  {
+    "code": 409,
+    "type": "Client Error",
+    "short": "Conflict",
+    "long": "Indicates that the request could not be processed because of conflict in the current state of the resource."
+  },
+  {
+    "code": 410,
+    "type": "Client Error",
+    "short": "Gone",
+    "long": "Indicates that the resource requested is no longer available and will not be available again."
+  },
+  {
+    "code": 411,
+    "type": "Client Error",
+    "short": "Length Required",
+    "long": "The request did not specify the length of its content, which is required by the requested resource."
+  },
+  {
+    "code": 412,
+    "type": "Client Error",
+    "short": "Precondition Failed",
+    "long": "The server does not meet one of the preconditions that the requester put on the request."
+  },
+  {
+    "code": 413,
+    "type": "Client Error",
+    "short": "Payload Too Large",
+    "long": "The request is larger than the server is willing or able to process."
+  },
+  {
+    "code": 414,
+    "type": "Client Error",
+    "short": "URI Too Long",
+    "long": "The URI provided was too long for the server to process."
+  },
+  {
+    "code": 415,
+    "type": "Client Error",
+    "short": "Unsupported Media Type",
+    "long": "The request entity has a media type which the server or resource does not support."
+  },
+  {
+    "code": 416,
+    "type": "Client Error",
+    "short": "Range Not Satisfiable",
+    "long": "The client has asked for a portion of the file, but the server cannot supply that portion."
+  },
+  {
+    "code": 417,
+    "type": "Client Error",
+    "short": "Expectation Failed",
+    "long": "The server cannot meet the requirements of the Expect request-header field."
+  },
+  {
+    "code": 418,
+    "type": "Client Error",
+    "short": "I'm a teapot",
+    "long": "Any attempt to brew coffee with a teapot should result in the error code '418 I'm a teapot'."
+  },
+  {
+    "code": 421,
+    "type": "Client Error",
+    "short": "Misdirected Request",
+    "long": "The request was directed at a server that is not able to produce a response."
+  },
+  {
+    "code": 422,
+    "type": "Client Error",
+    "short": "Unprocessable Entity",
+    "long": "The request was well-formed but was unable to be followed due to semantic errors."
+  },
+  {
+    "code": 423,
+    "type": "Client Error",
+    "short": "Locked",
+    "long": "The resource that is being accessed is locked."
+  },
+  {
+    "code": 424,
+    "type": "Client Error",
+    "short": "Failed Dependency",
+    "long": "The request failed because it depended on another request and that request failed."
+  },
+  {
+    "code": 425,
+    "type": "Client Error",
+    "short": "Too Early",
+    "long": "Indicates that the server is unwilling to risk processing a request that might be replayed."
+  },
+  {
+    "code": 426,
+    "type": "Client Error",
+    "short": "Upgrade Required",
+    "long": "The client should switch to a different protocol."
+  },
+  {
+    "code": 428,
+    "type": "Client Error",
+    "short": "Precondition Required",
+    "long": "The origin server requires the request to be conditional."
+  },
+  {
+    "code": 429,
+    "type": "Client Error",
+    "short": "Too Many Requests",
+    "long": "The user has sent too many requests in a given amount of time."
+  },
+  {
+    "code": 431,
+    "type": "Client Error",
+    "short": "Request Header Fields Too Large",
+    "long": "The server is unwilling to process the request because its header fields are too large."
+  },
+  {
+    "code": 451,
+    "type": "Client Error",
+    "short": "Unavailable For Legal Reasons",
+    "long": "A server operator has received a legal demand to deny access to a resource or to a set of resources."
+  },
+  {
+    "code": 500,
+    "type": "Server Error",
+    "short": "Internal Server Error",
+    "long": "A generic error message, given when an unexpected condition was encountered."
+  },
+  {
+    "code": 501,
+    "type": "Server Error",
+    "short": "Not Implemented",
+    "long": "The server either does not recognize the request method, or it lacks the ability to fulfill the request."
+  },
+  {
+    "code": 502,
+    "type": "Server Error",
+    "short": "Bad Gateway",
+    "long": "The server was acting as a gateway or proxy and received an invalid response from the upstream server."
+  },
+  {
+    "code": 503,
+    "type": "Server Error",
+    "short": "Service Unavailable",
+    "long": "The server is currently unavailable (because it is overloaded or down for maintenance)."
+  },
+  {
+    "code": 504,
+    "type": "Server Error",
+    "short": "Gateway Timeout",
+    "long": "The server was acting as a gateway or proxy and did not receive a timely response from the upstream server."
+  },
+  {
+    "code": 505,
+    "type": "Server Error",
+    "short": "HTTP Version Not Supported",
+    "long": "The server does not support the HTTP protocol version used in the request."
+  },
+  {
+    "code": 506,
+    "type": "Server Error",
+    "short": "Variant Also Negotiates",
+    "long": "Transparent content negotiation for the request results in a circular reference."
+  },
+  {
+    "code": 507,
+    "type": "Server Error",
+    "short": "Insufficient Storage",
+    "long": "The method could not be performed on the resource because the server is unable to store the representation needed to successfully complete the request."
+  },
+  {
+    "code": 508,
+    "type": "Server Error",
+    "short": "Loop Detected",
+    "long": "The server detected an infinite loop while processing the request."
+  },
+  {
+    "code": 510,
+    "type": "Server Error",
+    "short": "Not Extended",
+    "long": "Further extensions to the request are required for the server to fulfill it."
+  },
+  {
+    "code": 511,
+    "type": "Server Error",
+    "short": "Network Authentication Required",
+    "long": "The client needs to authenticate to gain network access."
+  }
+]
