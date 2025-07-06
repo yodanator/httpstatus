@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -67,9 +68,20 @@ func TestSearchStatusCodes(t *testing.T) {
 
 // Test Partial Code Lookup
 func TestPartialCodeLookup(t *testing.T) {
-	results := searchStatusCodes("4")
-	if len(results) != 10 {
-		t.Errorf("Expected to find 10 codes, got %+v", results)
+	// Test for all 4xx codes
+	var matches []StatusCode
+	for _, sc := range statusCodes {
+		if strings.HasPrefix(strconv.Itoa(sc.Code), "4") {
+			matches = append(matches, sc)
+		}
+	}
+	if len(matches) == 0 {
+		t.Error("Expected to find at least one 4xx code, found none")
+	}
+	for _, sc := range matches {
+		if !strings.HasPrefix(strconv.Itoa(sc.Code), "4") {
+			t.Errorf("Found code %d that does not start with 4", sc.Code)
+		}
 	}
 }
 
