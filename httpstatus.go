@@ -288,7 +288,7 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Printf("%s v%s\n\n", AppName, AppVersion)
+	fmt.Printf("%s %s\n\n", AppName, AppVersion)
 	fmt.Println("A CLI tool for looking up HTTP status codes with multiple output formats")
 	fmt.Printf("Source code and license: %s\n\n", GitHubURL)
 

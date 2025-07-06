@@ -4,6 +4,11 @@ on:
   push:
     tags: ['[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]']
 
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Manual tag'
+        required: true
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,7 +17,6 @@ jobs:
       run:
         working-directory: ${{ github.workspace }}
     permissions:
-      contents: write
       packages: write
     strategy:
       matrix:
@@ -127,6 +131,9 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: write 
+
     steps:
     - name: Download artifacts
       uses: actions/download-artifact@v4
@@ -139,9 +146,7 @@ jobs:
         mkdir -p release-assets
         
         # Handle nested artifact structure
-        if [ -d "dist-binaries" ]; then
-          find dist-binaries -type f -exec mv {} release-assets \;
-        fi
+        find dist-binaries -type f -exec mv -t release-assets {} +
 
         # Generate checksums
         cd release-assets
@@ -149,7 +154,7 @@ jobs:
         cd ..
         
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref }}
         name: Release ${{ github.ref_name }}
