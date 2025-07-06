@@ -77,8 +77,7 @@ jobs:
         fi
         
         # Inject version and repo URL during build
-        build_flags="-ldflags=-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w -trimpath"
-        CGO_ENABLED=0 go build $build_flags -o "$OUTPUT_DIR/$BINARY_NAME"
+        CGO_ENABLED=0 go build -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w -trimpath" -o "$OUTPUT_DIR/$BINARY_NAME"
         
         # Skip UPX for unsupported platforms
         if [[ "$GOOS" == "darwin" || \
