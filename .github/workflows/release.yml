@@ -79,9 +79,11 @@ jobs:
         CGO_ENABLED=0 go build $build_flags -o "$OUTPUT_DIR/$BINARY_NAME"
         
         # Skip UPX for unsupported platforms
-        if [[ "$GOOS" == "darwin" || 
-              ("$GOOS" == "windows" && "$GOARCH" == "arm64") || 
-              "$GOOS" == "freebsd" ]]; then
+        if [[ "$GOOS" == "darwin" || \
+              "$GOOS" == "freebsd" || \
+              "$GOARCH" == "arm" || \
+              "$GOARCH" == "arm64" || \
+              ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
           echo "Skipping UPX for $GOOS/$GOARCH"
         else
           upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
@@ -113,7 +115,7 @@ jobs:
         mv "$ARCHIVE_NAME".* artifacts/
         
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: httpstatus-binaries
         path: artifacts
@@ -123,7 +125,7 @@ jobs:
     needs: build
     steps:
     - name: Download artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: httpstatus-binaries
         path: dist-binaries
