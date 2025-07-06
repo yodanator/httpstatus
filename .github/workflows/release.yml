@@ -92,7 +92,7 @@ jobs:
         
     - name: Package release
       run: |
-        VERSION=${GITHUB_REF#refs/tags/v}
+        VERSION=${GITHUB_REF_NAME}
         OS=${{ matrix.platform.os }}
         ARCH=${{ matrix.platform.arch }}
         GOARM=${{ matrix.platform.goarm || '' }}
