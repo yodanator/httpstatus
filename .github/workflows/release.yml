@@ -12,7 +12,7 @@ jobs:
       run:
         working-directory: ${{ github.workspace }}
     permissions:
-      contents: read
+      contents: write
       packages: write
     strategy:
       matrix:
@@ -137,8 +137,12 @@ jobs:
       run: |
         # Combine all binaries into single directory
         mkdir -p release-assets
-        mv dist-binaries/*/* release-assets/
         
+        # Handle nested artifact structure
+        if [ -d "dist-binaries" ]; then
+          find dist-binaries -type f -exec mv {} release-assets \;
+        fi
+
         # Generate checksums
         cd release-assets
         sha256sum * > SHA256SUMS
