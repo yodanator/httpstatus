@@ -2,7 +2,7 @@ name: Release Build
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags: ['[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]']
 
 jobs:
   build:
@@ -55,7 +55,9 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.22'
-        
+    
+    - name: Run tests with coverage
+      run: go test -v -cover ./...
     - name: Install dependencies
       run: |
         sudo apt update
