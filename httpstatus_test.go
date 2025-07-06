@@ -1,3 +1,23 @@
+/*
+httpstatus - A CLI tool for looking up HTTP status codes in multiple formats.
+Copyright (C) 2025  Adam Maltby
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+For questions, issues, or contributions, please visit:
+https://github.com/yodanator/httpstatus
+*/
 package main
 
 import (
@@ -42,6 +62,14 @@ func TestSearchStatusCodes(t *testing.T) {
 	}
 	if !found {
 		t.Error("Expected to find code 404 in search for 'not found'")
+	}
+}
+
+// Test Partial Code Lookup
+func TestPartialCodeLookup(t *testing.T) {
+	results := searchStatusCodes("4")
+	if len(results) != 10 {
+		t.Errorf("Expected to find 10 codes, got %+v", results)
 	}
 }
 

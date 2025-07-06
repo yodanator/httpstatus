@@ -1,3 +1,24 @@
+/*
+httpstatus - A CLI tool for looking up HTTP status codes in multiple formats.
+Copyright (C) 2025  Adam Maltby
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+For questions, issues, or contributions, please visit:
+https://github.com/yodanator/httpstatus
+*/
+
 package main
 
 import (
@@ -184,27 +205,43 @@ func main() {
 			log.Fatalf("No HTTP status codes found matching search: '%s'", *search)
 		}
 	} else {
-		// Handle code lookup
+		var resultsSet bool
 		var httpCode int
 		if *code != 0 {
 			httpCode = *code
 		} else if len(args) > 0 {
-			// Try to parse first positional argument as integer
-			parsedCode, err := strconv.Atoi(args[0])
-			if err != nil {
-				log.Fatalf("Error: Invalid HTTP code '%s' - must be a number", args[0])
+			codeArg := args[0]
+			if len(codeArg) < 3 {
+				var matches []StatusCode
+				for _, sc := range statusCodes {
+					codeStr := strconv.Itoa(sc.Code)
+					if strings.HasPrefix(codeStr, codeArg) {
+						matches = append(matches, sc)
+					}
+				}
+				if len(matches) == 0 {
+					log.Fatalf("No HTTP status codes found starting with '%s'", codeArg)
+				}
+				results = matches
+				resultsSet = true
+			} else {
+				parsedCode, err := strconv.Atoi(codeArg)
+				if err != nil {
+					log.Fatalf("Error: Invalid HTTP code '%s' - must be a number", codeArg)
+				}
+				httpCode = parsedCode
 			}
-			httpCode = parsedCode
 		} else {
 			log.Fatal("Error: HTTP code must be specified with -c/--code or as a positional argument")
 		}
 
-		// Find the status code
-		result, found := findStatusCode(httpCode)
-		if !found {
-			log.Fatalf("Error: HTTP status code %d not found", httpCode)
+		if !resultsSet {
+			result, found := findStatusCode(httpCode)
+			if !found {
+				log.Fatalf("Error: HTTP status code %d not found", httpCode)
+			}
+			results = []StatusCode{result}
 		}
-		results = []StatusCode{result}
 	}
 
 	// Prepare output based on flags
@@ -256,7 +293,7 @@ func printHelp() {
 	fmt.Printf("Source code and license: %s\n\n", GitHubURL)
 
 	fmt.Println("USAGE:")
-	fmt.Println("  httpstatus [flags] [status_code]")
+	fmt.Println("  httpstatus [flags] [status_code|partial_code]")
 	fmt.Println("  httpstatus --search \"search term\"")
 	fmt.Println("  httpstatus --code 404")
 	fmt.Println("  httpstatus 200 --json-pretty")
@@ -277,16 +314,30 @@ func printHelp() {
 	fmt.Println("\nEXAMPLES:")
 	fmt.Println("  Look up status code 404:")
 	fmt.Println("      httpstatus -c 404")
-	fmt.Println("  \n  Search for 'not found':")
+	fmt.Println("  Look up all 4xx codes (client errors):")
+	fmt.Println("      httpstatus 4")
+	fmt.Println("  Look up all 41x codes:")
+	fmt.Println("      httpstatus 41")
+	fmt.Println("  Search for 'not found':")
 	fmt.Println("      httpstatus --search \"not found\"")
-	fmt.Println("  \n  Get status 200 in JSON format:")
+	fmt.Println("  Get status 200 in JSON format:")
 	fmt.Println("      httpstatus 200 --json")
-	fmt.Println("  \n  Get all details for status 500:")
+	fmt.Println("  Get all details for status 500:")
 	fmt.Println("      httpstatus 500 --all")
 
+	fmt.Println("\nPARTIAL CODE LOOKUP:")
+	fmt.Println("  You can enter just the first digit (e.g., '4') or first two digits (e.g., '41')")
+	fmt.Println("  to list all HTTP status codes in that set. This is separate from --search.")
+
 	fmt.Println("\nLICENSE:")
-	fmt.Println("  This software is distributed under the MIT License.")
-	fmt.Println("  For full terms, see the GitHub repository.")
+	fmt.Println("  By using this application, you accept the license terms and warranty disclaimer")
+	fmt.Println("  described in the LICENSE file at:")
+	fmt.Println("    https://github.com/yodanator/httpstatus/blob/main/LICENSE")
+	fmt.Println("  (This software is distributed under the GNU GPL v3. See LICENSE for details.)")
+
+	fmt.Println("\nCONTACT:")
+	fmt.Println("  For questions, issues, or contributions, please visit:")
+	fmt.Println("    https://github.com/yodanator/httpstatus")
 }
 
 // searchStatusCodes finds status codes matching the search term
