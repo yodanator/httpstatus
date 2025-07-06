@@ -104,13 +104,16 @@ jobs:
         ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
         
         cd dist
-        if [ "$OS" = "windows" ]; then
-          zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
+        if [ "$(ls -A)" ]; then
+          if [ "$OS" = "windows" ]; then
+            zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
+          else
+            tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
+          fi
+          rm -f *
         else
-          tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
+          echo "No files to archive in dist/"
         fi
-        # Cleanup
-        rm -f *
         cd ..
         mkdir -p artifacts
         mv "$ARCHIVE_NAME".* artifacts/
@@ -128,7 +131,6 @@ jobs:
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
-        name: httpstatus-binaries
         path: dist-binaries
         
     - name: Prepare release assets
