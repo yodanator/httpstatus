@@ -395,33 +395,36 @@ func TestTOMLEscaping(t *testing.T) {
 
 // Test prepareOutputs with empty long/short
 func TestPrepareOutputsWithNil(t *testing.T) {
-	codes := []StatusCode{
-		{Code: 204, Type: "Success", Short: nil, Long: nil},
-	}
+	// Create a test-specific status with nil descriptions
+	testCode := StatusCode{Code: 999, Type: "Test", Short: nil, Long: nil}
+	codes := []StatusCode{testCode}
 
 	// Only short
 	out := prepareOutputs(codes, false, false)
 	if out[0].Short != nil {
-		t.Error("Short should be nil for 204")
+		t.Error("Short should be nil for test code")
 	}
 
 	// Only long
 	out = prepareOutputs(codes, true, false)
 	if out[0].Long != nil {
-		t.Error("Long should be nil for 204")
+		t.Error("Long should be nil for test code")
 	}
 
 	// Both
 	out = prepareOutputs(codes, false, true)
 	if out[0].Short != nil || out[0].Long != nil {
-		t.Error("Both should be nil for 204")
+		t.Error("Both should be nil for test code")
 	}
 }
 
 // Test printText with empty fields
 func TestPrintTextWithNil(t *testing.T) {
+	// Test code with nil descriptions
+	testCode := StatusCode{Code: 999, Type: "Test", Short: nil, Long: nil}
+
 	codes := []StatusCode{
-		{Code: 204, Type: "Success", Short: nil, Long: nil},
+		testCode,
 		{Code: 404, Type: "Client Error", Short: strPtr("Not Found"), Long: strPtr("Resource not found")},
 	}
 
@@ -429,14 +432,14 @@ func TestPrintTextWithNil(t *testing.T) {
 	printText(&buf, codes)
 	output := buf.String()
 
-	// Should contain only code and type for 204
-	if !strings.Contains(output, "Code: 204") || !strings.Contains(output, "Type: Success") {
-		t.Error("Output missing 204 status")
+	// Should contain only code and type for test code
+	if !strings.Contains(output, "Code: 999") || !strings.Contains(output, "Type: Test") {
+		t.Error("Output missing test code status")
 	}
 
-	// Should not contain "Short:" or "Long:" for 204
+	// Should not contain "Short:" or "Long:" for test code
 	if strings.Contains(output, "Short:") || strings.Contains(output, "Long:") {
-		t.Error("Output should not contain short/long for 204")
+		t.Error("Output should not contain short/long for test code")
 	}
 
 	// Should contain both for 404
