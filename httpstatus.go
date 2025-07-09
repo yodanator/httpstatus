@@ -22,14 +22,17 @@ https://github.com/yodanator/httpstatus
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"gopkg.in/yaml.v3"
 )
@@ -41,10 +44,10 @@ func strPtr(s string) *string {
 
 // StatusCode represents an HTTP status code with metadata
 type StatusCode struct {
-	Code  int     `json:"code" xml:"code"`
-	Type  string  `json:"type" xml:"type"`
-	Short *string `json:"short,omitempty" xml:"short,omitempty"`
-	Long  *string `json:"long,omitempty" xml:"long,omitempty"`
+	Code  int     `json:"code" xml:"code" yaml:"code"`
+	Type  string  `json:"type" xml:"type" yaml:"type"`
+	Short *string `json:"short,omitempty" xml:"short,omitempty" yaml:"short,omitempty"`
+	Long  *string `json:"long,omitempty" xml:"long,omitempty" yaml:"long,omitempty"`
 }
 
 // HTTPStatusCollection wraps status codes for XML output
@@ -57,7 +60,7 @@ type HTTPStatusCollection struct {
 var (
 	AppName    = "httpstatus"
 	AppVersion = "dev"
-	GitHubURL  = "https://github.com/yourusername/httpstatus"
+	GitHubURL  = "https://github.com/yodanator/httpstatus"
 )
 
 var statusCodes = []StatusCode{
@@ -142,7 +145,7 @@ var statusCodes = []StatusCode{
 
 func main() {
 	// Command-line flags
-	code := flag.Int("c", 0, "HTTP status code (either this or search is required)")
+	code := flag.Int("c", 0, "HTTP status code (either this, search, or none for all codes)")
 	search := flag.String("search", "", "Search for HTTP status codes by keyword in short or long description")
 	long := flag.Bool("l", false, "Output long description")
 	all := flag.Bool("a", false, "Output both short and long descriptions")
@@ -152,9 +155,14 @@ func main() {
 	xmlPretty := flag.Bool("xml-pretty", false, "Output as pretty XML")
 	yamlOutput := flag.Bool("yaml", false, "Output as YAML (raw)")
 	yamlPretty := flag.Bool("yaml-pretty", false, "Output as pretty YAML")
+	tomlOutput := flag.Bool("toml", false, "Output as TOML")
+	tableOutput := flag.Bool("table", false, "Output as text table")
+	markdownOutput := flag.Bool("markdown", false, "Output as Markdown table")
+	csvOutput := flag.Bool("csv", false, "Output as CSV")
+	toFileBase := flag.String("to-file", "", "Save output to files with base name (automatic extensions)")
 
 	// Aliases for flags
-	flag.IntVar(code, "code", 0, "HTTP status code (either this or search is required)")
+	flag.IntVar(code, "code", 0, "HTTP status code (either this, search, or none for all codes)")
 	flag.StringVar(search, "s", "", "Search for HTTP status codes by keyword (shorthand)")
 	flag.BoolVar(long, "long", false, "Output long description")
 	flag.BoolVar(all, "all", false, "Output both short and long descriptions")
@@ -181,58 +189,57 @@ func main() {
 	// Get positional arguments
 	args := flag.Args()
 
-	// Validate input: either code or search must be provided
-	if *code == 0 && *search == "" && len(args) == 0 {
-		printHelp()
-		log.Fatal("\nError: Either HTTP code (-c) or search term (-search) must be specified")
-	}
-
-	// Check for conflicting options
-	if *code != 0 && *search != "" {
-		log.Fatal("Error: Cannot specify both -c and -search simultaneously")
-	}
-	if *all && *long {
-		fmt.Fprintln(os.Stderr, "Note: --long ignored because --all was specified")
-		*long = false
-	}
-
 	var results []StatusCode
 
-	// Handle search mode
-	if *search != "" {
-		results = searchStatusCodes(*search)
-		if len(results) == 0 {
-			log.Fatalf("No HTTP status codes found matching search: '%s'", *search)
-		}
+	// If no code or search specified, show all codes
+	if *code == 0 && *search == "" && len(args) == 0 {
+		results = statusCodes
 	} else {
+		// Check for conflicting options
+		if *code != 0 && *search != "" {
+			log.Fatal("Error: Cannot specify both -c and -search simultaneously")
+		}
+		if *all && *long {
+			fmt.Fprintln(os.Stderr, "Note: --long ignored because --all was specified")
+			*long = false
+		}
+
 		var resultsSet bool
 		var httpCode int
-		if *code != 0 {
-			httpCode = *code
-		} else if len(args) > 0 {
-			codeArg := args[0]
-			if len(codeArg) < 3 {
-				var matches []StatusCode
-				for _, sc := range statusCodes {
-					codeStr := strconv.Itoa(sc.Code)
-					if strings.HasPrefix(codeStr, codeArg) {
-						matches = append(matches, sc)
-					}
-				}
-				if len(matches) == 0 {
-					log.Fatalf("No HTTP status codes found starting with '%s'", codeArg)
-				}
-				results = matches
-				resultsSet = true
-			} else {
-				parsedCode, err := strconv.Atoi(codeArg)
-				if err != nil {
-					log.Fatalf("Error: Invalid HTTP code '%s' - must be a number", codeArg)
-				}
-				httpCode = parsedCode
+
+		// Handle search mode
+		if *search != "" {
+			results = searchStatusCodes(*search)
+			if len(results) == 0 {
+				log.Fatalf("No HTTP status codes found matching search: '%s'", *search)
 			}
+			resultsSet = true
 		} else {
-			log.Fatal("Error: HTTP code must be specified with -c/--code or as a positional argument")
+			if *code != 0 {
+				httpCode = *code
+			} else if len(args) > 0 {
+				codeArg := args[0]
+				if len(codeArg) < 3 {
+					var matches []StatusCode
+					for _, sc := range statusCodes {
+						codeStr := strconv.Itoa(sc.Code)
+						if strings.HasPrefix(codeStr, codeArg) {
+							matches = append(matches, sc)
+						}
+					}
+					if len(matches) == 0 {
+						log.Fatalf("No HTTP status codes found starting with '%s'", codeArg)
+					}
+					results = matches
+					resultsSet = true
+				} else {
+					parsedCode, err := strconv.Atoi(codeArg)
+					if err != nil {
+						log.Fatalf("Error: Invalid HTTP code '%s' - must be a number", codeArg)
+					}
+					httpCode = parsedCode
+				}
+			}
 		}
 
 		if !resultsSet {
@@ -258,32 +265,49 @@ func main() {
 		{"xml-pretty", *xmlPretty},
 		{"yaml", *yamlOutput},
 		{"yaml-pretty", *yamlPretty},
+		{"toml", *tomlOutput},
+		{"table", *tableOutput},
+		{"markdown", *markdownOutput},
+		{"csv", *csvOutput},
 	}
 
-	anyOutput := false
-	for _, format := range outputFormats {
-		if format.enabled {
-			anyOutput = true
-			switch format.name {
-			case "json":
-				printJSON(outputs, false)
-			case "json-pretty":
-				printJSON(outputs, true)
-			case "xml":
-				printXML(outputs, false)
-			case "xml-pretty":
-				printXML(outputs, true)
-			case "yaml":
-				printYAML(outputs, false)
-			case "yaml-pretty":
-				printYAML(outputs, true)
+	// Handle file output if requested
+	if *toFileBase != "" {
+		writeOutputToFiles(outputFormats, outputs, *toFileBase)
+	} else {
+		anyOutput := false
+		for _, format := range outputFormats {
+			if format.enabled {
+				anyOutput = true
+				switch format.name {
+				case "json":
+					printJSON(os.Stdout, outputs, false)
+				case "json-pretty":
+					printJSON(os.Stdout, outputs, true)
+				case "xml":
+					printXML(os.Stdout, outputs, false)
+				case "xml-pretty":
+					printXML(os.Stdout, outputs, true)
+				case "yaml":
+					printYAML(os.Stdout, outputs, false)
+				case "yaml-pretty":
+					printYAML(os.Stdout, outputs, true)
+				case "toml":
+					printTOML(os.Stdout, outputs)
+				case "table":
+					printTable(os.Stdout, outputs)
+				case "markdown":
+					printMarkdown(os.Stdout, outputs)
+				case "csv":
+					printCSV(os.Stdout, outputs)
+				}
 			}
 		}
-	}
 
-	// Default text output if no format specified
-	if !anyOutput {
-		printText(outputs)
+		// Default text output if no format specified
+		if !anyOutput {
+			printText(os.Stdout, outputs)
+		}
 	}
 }
 
@@ -297,8 +321,10 @@ func printHelp() {
 	fmt.Println("  httpstatus --search \"search term\"")
 	fmt.Println("  httpstatus --code 404")
 	fmt.Println("  httpstatus 200 --json-pretty")
+	fmt.Println("  httpstatus --to-file http_codes --json-pretty --yaml")
+	fmt.Println("  httpstatus --table  # Show all codes in table format")
 	fmt.Println("\nFLAGS:")
-	fmt.Println("  -c, --code <number>     HTTP status code to look up")
+	fmt.Println("  -c, --code <number>     HTTP status code to look up (omit for all codes)")
 	fmt.Println("  -s, --search <term>     Search status codes by keyword")
 	fmt.Println("  -l, --long              Show long description only")
 	fmt.Println("  -a, --all               Show both short and long descriptions")
@@ -308,12 +334,19 @@ func printHelp() {
 	fmt.Println("  --xml-pretty            Output as formatted XML")
 	fmt.Println("  --yaml                  Output as YAML")
 	fmt.Println("  --yaml-pretty           Output as formatted YAML")
+	fmt.Println("  --toml                  Output as TOML")
+	fmt.Println("  --table                 Output as text table")
+	fmt.Println("  --markdown              Output as Markdown table")
+	fmt.Println("  --csv                   Output as CSV")
+	fmt.Println("  --to-file <base>        Save output to files with base name (automatic extensions)")
 	fmt.Println("  --help                  Show this help message")
 	fmt.Println("  --version               Show version information")
 
 	fmt.Println("\nEXAMPLES:")
 	fmt.Println("  Look up status code 404:")
 	fmt.Println("      httpstatus -c 404")
+	fmt.Println("  Show all HTTP status codes in table format:")
+	fmt.Println("      httpstatus --table")
 	fmt.Println("  Look up all 4xx codes (client errors):")
 	fmt.Println("      httpstatus 4")
 	fmt.Println("  Look up all 41x codes:")
@@ -324,10 +357,19 @@ func printHelp() {
 	fmt.Println("      httpstatus 200 --json")
 	fmt.Println("  Get all details for status 500:")
 	fmt.Println("      httpstatus 500 --all")
+	fmt.Println("  Export all codes to JSON and YAML files:")
+	fmt.Println("      httpstatus --to-file http_codes --json-pretty --yaml")
+	fmt.Println("  Export search results to CSV:")
+	fmt.Println("      httpstatus --search \"error\" --csv --to-file errors")
 
 	fmt.Println("\nPARTIAL CODE LOOKUP:")
 	fmt.Println("  You can enter just the first digit (e.g., '4') or first two digits (e.g., '41')")
 	fmt.Println("  to list all HTTP status codes in that set. This is separate from --search.")
+
+	fmt.Println("\nFILE OUTPUT:")
+	fmt.Println("  Use --to-file with a base filename to save output to files. The tool will automatically")
+	fmt.Println("  add appropriate extensions based on the output format (.json, .yaml, .md, etc.).")
+	fmt.Println("  Multiple formats can be saved simultaneously by specifying multiple output flags.")
 
 	fmt.Println("\nLICENSE:")
 	fmt.Println("  By using this application, you accept the license terms and warranty disclaimer")
@@ -392,25 +434,25 @@ func prepareOutputs(codes []StatusCode, long, all bool) []StatusCode {
 }
 
 // printText outputs human-readable text
-func printText(codes []StatusCode) {
+func printText(w io.Writer, codes []StatusCode) {
 	for i, sc := range codes {
 		if i > 0 {
-			fmt.Println()
-			fmt.Println("---")
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "---")
 		}
-		fmt.Printf("Code: %d\nType: %s\n", sc.Code, sc.Type)
+		fmt.Fprintf(w, "Code: %d\nType: %s\n", sc.Code, sc.Type)
 		if sc.Short != nil && sc.Long != nil {
-			fmt.Printf("Short: %s\nLong: %s\n", *sc.Short, *sc.Long)
+			fmt.Fprintf(w, "Short: %s\nLong: %s\n", *sc.Short, *sc.Long)
 		} else if sc.Long != nil {
-			fmt.Printf("Long: %s\n", *sc.Long)
+			fmt.Fprintf(w, "Long: %s\n", *sc.Long)
 		} else if sc.Short != nil {
-			fmt.Printf("Short: %s\n", *sc.Short)
+			fmt.Fprintf(w, "Short: %s\n", *sc.Short)
 		}
 	}
 }
 
 // printJSON outputs JSON format
-func printJSON(codes []StatusCode, pretty bool) {
+func printJSON(w io.Writer, codes []StatusCode, pretty bool) {
 	var data []byte
 	var err error
 
@@ -423,11 +465,11 @@ func printJSON(codes []StatusCode, pretty bool) {
 	if err != nil {
 		log.Fatalf("JSON error: %v", err)
 	}
-	fmt.Println(string(data))
+	fmt.Fprintln(w, string(data))
 }
 
 // printXML outputs XML format
-func printXML(codes []StatusCode, pretty bool) {
+func printXML(w io.Writer, codes []StatusCode, pretty bool) {
 	// Wrap in a root element for valid XML
 	collection := HTTPStatusCollection{Codes: codes}
 
@@ -445,28 +487,179 @@ func printXML(codes []StatusCode, pretty bool) {
 	}
 
 	// Add XML header
-	fmt.Println(xml.Header + string(data))
+	fmt.Fprint(w, xml.Header+string(data))
 }
 
 // printYAML outputs YAML format
-func printYAML(codes []StatusCode, pretty bool) {
-	if pretty {
-		// Print each code as a separate document with proper indentation
-		for i, sc := range codes {
-			if i > 0 {
-				fmt.Println("---")
-			}
-			data, err := yaml.Marshal(sc)
-			if err != nil {
-				log.Fatalf("YAML error: %v", err)
-			}
-			fmt.Println(string(data))
+func printYAML(w io.Writer, codes []StatusCode, pretty bool) {
+	for i, sc := range codes {
+		if pretty && i > 0 {
+			fmt.Fprintln(w, "---")
 		}
-	} else {
-		data, err := yaml.Marshal(codes)
+		data, err := yaml.Marshal(sc)
 		if err != nil {
 			log.Fatalf("YAML error: %v", err)
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(w, string(data))
+	}
+}
+
+// printTOML outputs TOML format
+func printTOML(w io.Writer, codes []StatusCode) {
+	for i, sc := range codes {
+		if i > 0 {
+			fmt.Fprintln(w)
+		}
+		fmt.Fprintf(w, "[%d]\n", sc.Code)
+		fmt.Fprintf(w, "type = \"%s\"\n", sc.Type)
+
+		if sc.Short != nil {
+			fmt.Fprintf(w, "short = \"%s\"\n", escapeTOMLString(*sc.Short))
+		}
+
+		if sc.Long != nil {
+			fmt.Fprintf(w, "long = \"%s\"\n", escapeTOMLString(*sc.Long))
+		}
+	}
+}
+
+// escapeTOMLString escapes special characters in TOML strings
+func escapeTOMLString(s string) string {
+	// TOML requires escaping backslashes and quotes
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\\", "\\\\"), "\"", "\\\"")
+}
+
+// printTable outputs tabular text format
+func printTable(w io.Writer, codes []StatusCode) {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	defer tw.Flush()
+
+	// Header
+	fmt.Fprintln(tw, "CODE\tTYPE\tSHORT\tLONG")
+
+	for _, sc := range codes {
+		short := ""
+		if sc.Short != nil {
+			short = *sc.Short
+		}
+
+		long := ""
+		if sc.Long != nil {
+			long = *sc.Long
+		}
+
+		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n", sc.Code, sc.Type, short, long)
+	}
+}
+
+// printMarkdown outputs Markdown table format
+func printMarkdown(w io.Writer, codes []StatusCode) {
+	// Table header
+	fmt.Fprintln(w, "| Code | Type | Short | Long |")
+	fmt.Fprintln(w, "|------|------|-------|------|")
+
+	for _, sc := range codes {
+		short := ""
+		if sc.Short != nil {
+			short = *sc.Short
+		}
+
+		long := ""
+		if sc.Long != nil {
+			long = *sc.Long
+		}
+
+		fmt.Fprintf(w, "| %d | %s | %s | %s |\n", sc.Code, sc.Type, short, long)
+	}
+}
+
+// printCSV outputs CSV format
+func printCSV(w io.Writer, codes []StatusCode) {
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+
+	// Write header
+	cw.Write([]string{"Code", "Type", "Short", "Long"})
+
+	for _, sc := range codes {
+		short := ""
+		if sc.Short != nil {
+			short = *sc.Short
+		}
+
+		long := ""
+		if sc.Long != nil {
+			long = *sc.Long
+		}
+
+		cw.Write([]string{
+			strconv.Itoa(sc.Code),
+			sc.Type,
+			short,
+			long,
+		})
+	}
+}
+
+// writeOutputToFiles saves output to files based on format
+func writeOutputToFiles(formats []struct {
+	name    string
+	enabled bool
+}, codes []StatusCode, basePath string) {
+	extMap := map[string]string{
+		"json":        ".json",
+		"json-pretty": ".json",
+		"xml":         ".xml",
+		"xml-pretty":  ".xml",
+		"yaml":        ".yaml",
+		"yaml-pretty": ".yaml",
+		"toml":        ".toml",
+		"table":       ".txt",
+		"markdown":    ".md",
+		"csv":         ".csv",
+	}
+
+	for _, format := range formats {
+		if !format.enabled {
+			continue
+		}
+
+		ext, ok := extMap[format.name]
+		if !ok {
+			log.Printf("Skipping unknown format: %s", format.name)
+			continue
+		}
+
+		filename := basePath + ext
+		file, err := os.Create(filename)
+		if err != nil {
+			log.Printf("Error creating %s: %v", filename, err)
+			continue
+		}
+		defer file.Close()
+
+		switch format.name {
+		case "json":
+			printJSON(file, codes, false)
+		case "json-pretty":
+			printJSON(file, codes, true)
+		case "xml":
+			printXML(file, codes, false)
+		case "xml-pretty":
+			printXML(file, codes, true)
+		case "yaml":
+			printYAML(file, codes, false)
+		case "yaml-pretty":
+			printYAML(file, codes, true)
+		case "toml":
+			printTOML(file, codes)
+		case "table":
+			printTable(file, codes)
+		case "markdown":
+			printMarkdown(file, codes)
+		case "csv":
+			printCSV(file, codes)
+		}
+		log.Printf("Output saved to %s", filename)
 	}
 }

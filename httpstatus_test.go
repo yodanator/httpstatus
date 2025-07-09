@@ -24,6 +24,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"log"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -108,28 +110,53 @@ func TestPrepareOutputs(t *testing.T) {
 	}
 }
 
-// Test printText output (checks for panic)
+// Test printText output
 func TestPrintText(t *testing.T) {
 	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("printText panicked: %v", r)
+	var buf bytes.Buffer
+
+	printText(&buf, codes)
+	output := buf.String()
+
+	expected := []string{
+		"Code: 200",
+		"Type: Success",
+		"Short: OK",
+		"Long: All good",
+	}
+
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected output to contain: %s\nGot: %s", exp, output)
 		}
-	}()
-	printText(codes)
+	}
 }
 
 // Test printJSON output
 func TestPrintJSON(t *testing.T) {
 	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
 	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	err := enc.Encode(codes)
-	if err != nil {
-		t.Errorf("printJSON failed: %v", err)
+
+	printJSON(&buf, codes, false)
+	output := buf.String()
+
+	// Parse output to verify valid JSON
+	var decoded []StatusCode
+	if err := json.Unmarshal([]byte(output), &decoded); err != nil {
+		t.Fatalf("Invalid JSON output: %v\nOutput: %s", err, output)
 	}
-	if !strings.Contains(buf.String(), "OK") {
-		t.Error("printJSON output missing expected content")
+
+	// Verify content
+	if decoded[0].Code != 200 || *decoded[0].Short != "OK" {
+		t.Errorf("Unexpected JSON content: %+v", decoded)
+	}
+
+	// Test pretty print
+	buf.Reset()
+	printJSON(&buf, codes, true)
+	output = buf.String()
+	if !strings.Contains(output, "  \"code\": 200") {
+		t.Errorf("Pretty JSON missing expected indentation:\n%s", output)
 	}
 }
 
@@ -137,13 +164,27 @@ func TestPrintJSON(t *testing.T) {
 func TestPrintXML(t *testing.T) {
 	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
 	var buf bytes.Buffer
-	enc := xml.NewEncoder(&buf)
-	err := enc.Encode(codes)
-	if err != nil {
-		t.Errorf("printXML failed: %v", err)
+
+	printXML(&buf, codes, false)
+	output := buf.String()
+
+	// Parse output to verify valid XML
+	var collection HTTPStatusCollection
+	if err := xml.Unmarshal([]byte(output), &collection); err != nil {
+		t.Fatalf("Invalid XML output: %v\nOutput: %s", err, output)
 	}
-	if !strings.Contains(buf.String(), "OK") {
-		t.Error("printXML output missing expected content")
+
+	// Verify content
+	if len(collection.Codes) != 1 || collection.Codes[0].Code != 200 {
+		t.Errorf("Unexpected XML content: %+v", collection)
+	}
+
+	// Test pretty print
+	buf.Reset()
+	printXML(&buf, codes, true)
+	output = buf.String()
+	if !strings.Contains(output, "  <http_status>") {
+		t.Errorf("Pretty XML missing expected indentation:\n%s", output)
 	}
 }
 
@@ -151,12 +192,255 @@ func TestPrintXML(t *testing.T) {
 func TestPrintYAML(t *testing.T) {
 	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
 	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	err := enc.Encode(codes)
-	if err != nil {
-		t.Errorf("printYAML failed: %v", err)
+
+	printYAML(&buf, codes, false)
+	output := buf.String()
+
+	// Parse output to verify valid YAML
+	var decoded []StatusCode
+	if err := yaml.Unmarshal([]byte(output), &decoded); err != nil {
+		t.Fatalf("Invalid YAML output: %v\nOutput: %s", err, output)
 	}
-	if !strings.Contains(buf.String(), "OK") {
-		t.Error("printYAML output missing expected content")
+
+	// Verify content
+	if decoded[0].Code != 200 || *decoded[0].Short != "OK" {
+		t.Errorf("Unexpected YAML content: %+v", decoded)
+	}
+
+	// Test pretty with multiple items
+	buf.Reset()
+	codes = []StatusCode{
+		{Code: 200, Type: "Success", Short: strPtr("OK")},
+		{Code: 201, Type: "Success", Short: strPtr("Created")},
+	}
+	printYAML(&buf, codes, true)
+	output = buf.String()
+	if !strings.Contains(output, "---") {
+		t.Errorf("Pretty YAML missing document separator:\n%s", output)
+	}
+}
+
+// Test printTOML output
+func TestPrintTOML(t *testing.T) {
+	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
+	var buf bytes.Buffer
+
+	printTOML(&buf, codes)
+	output := buf.String()
+
+	expected := []string{
+		"[200]",
+		"type = \"Success\"",
+		"short = \"OK\"",
+		"long = \"All good\"",
+	}
+
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected TOML output to contain: %s\nGot: %s", exp, output)
+		}
+	}
+}
+
+// Test printTable output
+func TestPrintTable(t *testing.T) {
+	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
+	var buf bytes.Buffer
+
+	printTable(&buf, codes)
+	output := buf.String()
+
+	expected := []string{
+		"CODE\tTYPE\tSHORT\tLONG",
+		"200\tSuccess\tOK\tAll good",
+	}
+
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected table output to contain: %s\nGot: %s", exp, output)
+		}
+	}
+}
+
+// Test printMarkdown output
+func TestPrintMarkdown(t *testing.T) {
+	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
+	var buf bytes.Buffer
+
+	printMarkdown(&buf, codes)
+	output := buf.String()
+
+	expected := []string{
+		"| Code | Type | Short | Long |",
+		"|------|------|-------|------|",
+		"| 200 | Success | OK | All good |",
+	}
+
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected markdown output to contain: %s\nGot: %s", exp, output)
+		}
+	}
+}
+
+// Test printCSV output
+func TestPrintCSV(t *testing.T) {
+	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
+	var buf bytes.Buffer
+
+	printCSV(&buf, codes)
+	output := buf.String()
+
+	expected := []string{
+		"Code,Type,Short,Long",
+		"200,Success,OK,All good",
+	}
+
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected CSV output to contain: %s\nGot: %s", exp, output)
+		}
+	}
+}
+
+// Test file output functionality
+func TestWriteOutputToFiles(t *testing.T) {
+	// Create temp directory for test files
+	tempDir := t.TempDir()
+	basePath := tempDir + "/output"
+
+	formats := []struct {
+		name    string
+		enabled bool
+	}{
+		{"json", true},
+		{"toml", true},
+		{"csv", true},
+	}
+
+	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK")}}
+
+	writeOutputToFiles(formats, codes, basePath)
+
+	// Check that files were created
+	expectedFiles := []string{
+		basePath + ".json",
+		basePath + ".toml",
+		basePath + ".csv",
+	}
+
+	for _, file := range expectedFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			t.Errorf("Expected file not created: %s", file)
+		}
+	}
+}
+
+// Test output when no code or search is provided
+func TestAllCodesOutput(t *testing.T) {
+	// Simulate no code/search provided
+	results := prepareOutputs(statusCodes, false, false)
+
+	if len(results) != len(statusCodes) {
+		t.Errorf("Expected %d codes, got %d", len(statusCodes), len(results))
+	}
+}
+
+// Test file output with unknown format
+func TestUnknownFormatFileOutput(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := tempDir + "/output"
+
+	formats := []struct {
+		name    string
+		enabled bool
+	}{
+		{"unknown-format", true},
+	}
+
+	codes := []StatusCode{{Code: 200}}
+
+	// Capture log output
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer func() {
+		log.SetOutput(os.Stderr)
+	}()
+
+	writeOutputToFiles(formats, codes, basePath)
+
+	if !strings.Contains(buf.String(), "Skipping unknown format") {
+		t.Error("Expected warning about unknown format")
+	}
+}
+
+// Test TOML escaping
+func TestTOMLEscaping(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{`Hello "World"`, `Hello \"World\"`},
+		{`Back\Slash`, `Back\\Slash`},
+		{`No special chars`, `No special chars`},
+	}
+
+	for _, tc := range testCases {
+		result := escapeTOMLString(tc.input)
+		if result != tc.expected {
+			t.Errorf("For input '%s', expected '%s', got '%s'", tc.input, tc.expected, result)
+		}
+	}
+}
+
+// Test prepareOutputs with empty long/short
+func TestPrepareOutputsWithNil(t *testing.T) {
+	codes := []StatusCode{
+		{Code: 204, Type: "Success", Short: nil, Long: nil},
+	}
+
+	// Only short
+	out := prepareOutputs(codes, false, false)
+	if out[0].Short != nil {
+		t.Error("Short should be nil for 204")
+	}
+
+	// Only long
+	out = prepareOutputs(codes, true, false)
+	if out[0].Long != nil {
+		t.Error("Long should be nil for 204")
+	}
+
+	// Both
+	out = prepareOutputs(codes, false, true)
+	if out[0].Short != nil || out[0].Long != nil {
+		t.Error("Both should be nil for 204")
+	}
+}
+
+// Test printText with empty fields
+func TestPrintTextWithNil(t *testing.T) {
+	codes := []StatusCode{
+		{Code: 204, Type: "Success", Short: nil, Long: nil},
+		{Code: 404, Type: "Client Error", Short: strPtr("Not Found"), Long: strPtr("Resource not found")},
+	}
+
+	var buf bytes.Buffer
+	printText(&buf, codes)
+	output := buf.String()
+
+	// Should contain only code and type for 204
+	if !strings.Contains(output, "Code: 204") || !strings.Contains(output, "Type: Success") {
+		t.Error("Output missing 204 status")
+	}
+
+	// Should not contain "Short:" or "Long:" for 204
+	if strings.Contains(output, "Short:") || strings.Contains(output, "Long:") {
+		t.Error("Output should not contain short/long for 204")
+	}
+
+	// Should contain both for 404
+	if !strings.Contains(output, "Short: Not Found") || !strings.Contains(output, "Long: Resource not found") {
+		t.Error("Output missing 404 details")
 	}
 }
