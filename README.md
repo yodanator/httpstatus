@@ -38,7 +38,11 @@ httpstatus [flags] [status_code|partial_code]
   ```
   httpstatus 200 --json
   ```
-
+- **See help for all flags and output options:**
+  ```
+  httpstatus --help
+  ```
+  
 ### Partial Code Lookup
 
 You can enter just the first digit (e.g., `4`) or first two digits (e.g., `41`) to list all HTTP status codes in that set.  
