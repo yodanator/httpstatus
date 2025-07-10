@@ -193,21 +193,22 @@ func TestPrintYAML(t *testing.T) {
 	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
 	var buf bytes.Buffer
 
+	// Test single item
 	printYAML(&buf, codes, false)
 	output := buf.String()
 
 	// Parse output to verify valid YAML
-	var decoded []StatusCode
+	var decoded StatusCode
 	if err := yaml.Unmarshal([]byte(output), &decoded); err != nil {
 		t.Fatalf("Invalid YAML output: %v\nOutput: %s", err, output)
 	}
 
 	// Verify content
-	if decoded[0].Code != 200 || *decoded[0].Short != "OK" {
+	if decoded.Code != 200 || *decoded.Short != "OK" {
 		t.Errorf("Unexpected YAML content: %+v", decoded)
 	}
 
-	// Test pretty with multiple items
+	// Test multiple items with pretty output
 	buf.Reset()
 	codes = []StatusCode{
 		{Code: 200, Type: "Success", Short: strPtr("OK")},
@@ -215,6 +216,32 @@ func TestPrintYAML(t *testing.T) {
 	}
 	printYAML(&buf, codes, true)
 	output = buf.String()
+
+	// Split documents for multi-item output
+	documents := strings.Split(strings.TrimSpace(output), "\n---\n")
+	if len(documents) != 2 {
+		t.Fatalf("Expected 2 YAML documents, got %d", len(documents))
+	}
+
+	// Parse first document
+	var item1 StatusCode
+	if err := yaml.Unmarshal([]byte(documents[0]), &item1); err != nil {
+		t.Fatalf("Invalid YAML document 1: %v\n%v", err, documents[0])
+	}
+	if item1.Code != 200 || *item1.Short != "OK" {
+		t.Errorf("Unexpected first item: %+v", item1)
+	}
+
+	// Parse second document
+	var item2 StatusCode
+	if err := yaml.Unmarshal([]byte(documents[1]), &item2); err != nil {
+		t.Fatalf("Invalid YAML document 2: %v\n%v", err, documents[1])
+	}
+	if item2.Code != 201 || *item2.Short != "Created" {
+		t.Errorf("Unexpected second item: %+v", item2)
+	}
+
+	// Verify document separator
 	if !strings.Contains(output, "---") {
 		t.Errorf("Pretty YAML missing document separator:\n%s", output)
 	}
@@ -243,6 +270,7 @@ func TestPrintTOML(t *testing.T) {
 }
 
 // Test printTable output
+
 func TestPrintTable(t *testing.T) {
 	codes := []StatusCode{{Code: 200, Type: "Success", Short: strPtr("OK"), Long: strPtr("All good")}}
 	var buf bytes.Buffer
@@ -250,14 +278,25 @@ func TestPrintTable(t *testing.T) {
 	printTable(&buf, codes)
 	output := buf.String()
 
-	expected := []string{
-		"CODE\tTYPE\tSHORT\tLONG",
-		"200\tSuccess\tOK\tAll good",
+	// Split into lines and trim space
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("Not enough lines in output: %d", len(lines))
 	}
 
-	for _, exp := range expected {
-		if !strings.Contains(output, exp) {
-			t.Errorf("Expected table output to contain: %s\nGot: %s", exp, output)
+	// Check headers
+	expectedHeaders := []string{"CODE", "TYPE", "SHORT", "LONG"}
+	for _, header := range expectedHeaders {
+		if !strings.Contains(lines[0], header) {
+			t.Errorf("Header missing %q in: %s", header, lines[0])
+		}
+	}
+
+	// Check data row
+	expectedData := []string{"200", "Success", "OK", "All good"}
+	for _, data := range expectedData {
+		if !strings.Contains(lines[1], data) {
+			t.Errorf("Data missing %q in: %s", data, lines[1])
 		}
 	}
 }
