@@ -456,7 +456,10 @@ func TestPrintTextWithNil(t *testing.T) {
 
 // Test multi-code input
 func TestMultiCodeInput(t *testing.T) {
-	results := processInputs("200,404", "", nil)
+	results, err := processInputs("200,404", "", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	if len(results) != 2 {
 		t.Fatalf("Expected 2 codes, got %d", len(results))
@@ -478,7 +481,10 @@ func TestMultiCodeInput(t *testing.T) {
 
 // Test combined search and codes
 func TestCombinedSearchAndCodes(t *testing.T) {
-	results := processInputs("404", "teapot", nil)
+	results, err := processInputs("404", "teapot", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	if len(results) < 2 {
 		t.Fatalf("Expected at least 2 codes, got %d", len(results))
@@ -500,7 +506,10 @@ func TestCombinedSearchAndCodes(t *testing.T) {
 
 // Test partial code input
 func TestPartialCodeInput(t *testing.T) {
-	results := processInputs("4,5", "", nil)
+	results, err := processInputs("4,5", "", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	// Count 4xx and 5xx codes
 	count4xx := 0
@@ -520,7 +529,10 @@ func TestPartialCodeInput(t *testing.T) {
 
 // Test duplicate prevention
 func TestDuplicatePrevention(t *testing.T) {
-	results := processInputs("404,404,4", "", nil)
+	results, err := processInputs("404,404,4", "", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	// Verify no duplicates
 	codes := make(map[int]bool)
@@ -534,19 +546,23 @@ func TestDuplicatePrevention(t *testing.T) {
 
 // Test invalid code input
 func TestInvalidCodeInput(t *testing.T) {
-	// Should log fatal
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Expected fatal error for invalid code input")
+	_, err := processInputs("abc", "", nil)
+	if err == nil {
+		t.Error("Expected error for invalid code input")
+	} else {
+		expected := "invalid status code: 'abc' - must be numeric"
+		if err.Error() != expected {
+			t.Errorf("Expected error '%s', got '%s'", expected, err.Error())
 		}
-	}()
-
-	processInputs("abc", "", nil)
+	}
 }
 
 // Test empty input
 func TestEmptyInput(t *testing.T) {
-	results := processInputs("", "", nil)
+	results, err := processInputs("", "", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	if len(results) != len(statusCodes) {
 		t.Errorf("Expected all codes, got %d instead of %d", len(results), len(statusCodes))

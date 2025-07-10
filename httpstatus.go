@@ -187,7 +187,10 @@ func main() {
 	}
 
 	// Process inputs
-	results := processInputs(*codeFlag, *searchFlag, flag.Args())
+	results, err := processInputs(*codeFlag, *searchFlag, flag.Args())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Prepare output based on flags
 	outputs := prepareOutputs(results, *longFlag, *allFlag)
@@ -250,7 +253,7 @@ func main() {
 }
 
 // processInputs handles the input processing and returns the status codes to display
-func processInputs(codeStr, searchStr string, args []string) []StatusCode {
+func processInputs(codeStr, searchStr string, args []string) ([]StatusCode, error) {
 	var results []StatusCode
 	seen := make(map[int]bool) // Track seen codes to prevent duplicates
 
@@ -271,6 +274,11 @@ func processInputs(codeStr, searchStr string, args []string) []StatusCode {
 				continue
 			}
 
+			// Validate input is numeric
+			if _, err := strconv.Atoi(part); err != nil {
+				return nil, fmt.Errorf("invalid status code: '%s' - must be numeric", part)
+			}
+
 			// Try to parse as exact code
 			if codeInt, err := strconv.Atoi(part); err == nil {
 				if sc, found := findStatusCode(codeInt); found {
@@ -288,7 +296,7 @@ func processInputs(codeStr, searchStr string, args []string) []StatusCode {
 				}
 			}
 			if len(matches) == 0 {
-				log.Fatalf("No HTTP status codes found matching: '%s'", part)
+				return nil, fmt.Errorf("no HTTP status codes found matching: '%s'", part)
 			}
 			for _, sc := range matches {
 				addIfNotSeen(sc)
@@ -323,7 +331,7 @@ func processInputs(codeStr, searchStr string, args []string) []StatusCode {
 					}
 				}
 				if len(matches) == 0 {
-					log.Fatalf("No HTTP status codes found matching: '%s'", part)
+					return nil, fmt.Errorf("no HTTP status codes found matching: '%s'", part)
 				}
 				for _, sc := range matches {
 					addIfNotSeen(sc)
@@ -347,7 +355,7 @@ func processInputs(codeStr, searchStr string, args []string) []StatusCode {
 		log.Fatal("No HTTP status codes found matching your criteria")
 	}
 
-	return results
+	return results, nil
 }
 
 func printHelp() {
