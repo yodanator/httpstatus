@@ -143,116 +143,54 @@ var statusCodes = []StatusCode{
 	{Code: 511, Type: "Server Error", Short: strPtr("Network Authentication Required"), Long: strPtr("Client needs authentication for network access")},
 }
 
+// Package-level variables for flags
+var (
+	codeFlag       = flag.String("c", "", "HTTP status code(s) (comma-separated) (either this, search, or none for all codes)")
+	searchFlag     = flag.String("search", "", "Search for HTTP status codes by keyword in short or long description")
+	longFlag       = flag.Bool("l", false, "Output long description")
+	allFlag        = flag.Bool("a", false, "Output both short and long descriptions")
+	jsonOutput     = flag.Bool("json", false, "Output as JSON (raw)")
+	jsonPretty     = flag.Bool("json-pretty", false, "Output as pretty JSON")
+	xmlOutput      = flag.Bool("xml", false, "Output as XML (raw)")
+	xmlPretty      = flag.Bool("xml-pretty", false, "Output as pretty XML")
+	yamlOutput     = flag.Bool("yaml", false, "Output as YAML (raw)")
+	yamlPretty     = flag.Bool("yaml-pretty", false, "Output as pretty YAML")
+	tomlOutput     = flag.Bool("toml", false, "Output as TOML")
+	tableOutput    = flag.Bool("table", false, "Output as text table")
+	markdownOutput = flag.Bool("markdown", false, "Output as Markdown table")
+	csvOutput      = flag.Bool("csv", false, "Output as CSV")
+	toFileBase     = flag.String("to-file", "", "Save output to files with base name (automatic extensions)")
+	helpFlag       = flag.Bool("help", false, "Show help information")
+	versionFlag    = flag.Bool("version", false, "Show version information")
+)
+
 func main() {
-	// Command-line flags
-	code := flag.Int("c", 0, "HTTP status code (either this, search, or none for all codes)")
-	search := flag.String("search", "", "Search for HTTP status codes by keyword in short or long description")
-	long := flag.Bool("l", false, "Output long description")
-	all := flag.Bool("a", false, "Output both short and long descriptions")
-	jsonOutput := flag.Bool("json", false, "Output as JSON (raw)")
-	jsonPretty := flag.Bool("json-pretty", false, "Output as pretty JSON")
-	xmlOutput := flag.Bool("xml", false, "Output as XML (raw)")
-	xmlPretty := flag.Bool("xml-pretty", false, "Output as pretty XML")
-	yamlOutput := flag.Bool("yaml", false, "Output as YAML (raw)")
-	yamlPretty := flag.Bool("yaml-pretty", false, "Output as pretty YAML")
-	tomlOutput := flag.Bool("toml", false, "Output as TOML")
-	tableOutput := flag.Bool("table", false, "Output as text table")
-	markdownOutput := flag.Bool("markdown", false, "Output as Markdown table")
-	csvOutput := flag.Bool("csv", false, "Output as CSV")
-	toFileBase := flag.String("to-file", "", "Save output to files with base name (automatic extensions)")
-
 	// Aliases for flags
-	flag.IntVar(code, "code", 0, "HTTP status code (either this, search, or none for all codes)")
-	flag.StringVar(search, "s", "", "Search for HTTP status codes by keyword (shorthand)")
-	flag.BoolVar(long, "long", false, "Output long description")
-	flag.BoolVar(all, "all", false, "Output both short and long descriptions")
-
-	// Help and version flags
-	help := flag.Bool("help", false, "Show help information")
-	version := flag.Bool("version", false, "Show version information")
+	flag.StringVar(codeFlag, "code", "", "HTTP status code(s) (comma-separated) (either this, search, or none for all codes)")
+	flag.StringVar(searchFlag, "s", "", "Search for HTTP status codes by keyword (shorthand)")
+	flag.BoolVar(longFlag, "long", false, "Output long description")
+	flag.BoolVar(allFlag, "all", false, "Output both short and long descriptions")
 
 	flag.Parse()
 
 	// Handle help flag
-	if *help {
+	if *helpFlag {
 		printHelp()
 		os.Exit(0)
 	}
 
 	// Handle version flag
-	if *version {
+	if *versionFlag {
 		fmt.Printf("%s v%s\n", AppName, AppVersion)
 		fmt.Printf("Source: %s\n", GitHubURL)
 		os.Exit(0)
 	}
 
-	// Get positional arguments
-	args := flag.Args()
-
-	var results []StatusCode
-
-	// If no code or search specified, show all codes
-	if *code == 0 && *search == "" && len(args) == 0 {
-		results = statusCodes
-	} else {
-		// Check for conflicting options
-		if *code != 0 && *search != "" {
-			log.Fatal("Error: Cannot specify both -c and -search simultaneously")
-		}
-		if *all && *long {
-			fmt.Fprintln(os.Stderr, "Note: --long ignored because --all was specified")
-			*long = false
-		}
-
-		var resultsSet bool
-		var httpCode int
-
-		// Handle search mode
-		if *search != "" {
-			results = searchStatusCodes(*search)
-			if len(results) == 0 {
-				log.Fatalf("No HTTP status codes found matching search: '%s'", *search)
-			}
-			resultsSet = true
-		} else {
-			if *code != 0 {
-				httpCode = *code
-			} else if len(args) > 0 {
-				codeArg := args[0]
-				if len(codeArg) < 3 {
-					var matches []StatusCode
-					for _, sc := range statusCodes {
-						codeStr := strconv.Itoa(sc.Code)
-						if strings.HasPrefix(codeStr, codeArg) {
-							matches = append(matches, sc)
-						}
-					}
-					if len(matches) == 0 {
-						log.Fatalf("No HTTP status codes found starting with '%s'", codeArg)
-					}
-					results = matches
-					resultsSet = true
-				} else {
-					parsedCode, err := strconv.Atoi(codeArg)
-					if err != nil {
-						log.Fatalf("Error: Invalid HTTP code '%s' - must be a number", codeArg)
-					}
-					httpCode = parsedCode
-				}
-			}
-		}
-
-		if !resultsSet {
-			result, found := findStatusCode(httpCode)
-			if !found {
-				log.Fatalf("Error: HTTP status code %d not found", httpCode)
-			}
-			results = []StatusCode{result}
-		}
-	}
+	// Process inputs
+	results := processInputs(*codeFlag, *searchFlag, flag.Args())
 
 	// Prepare output based on flags
-	outputs := prepareOutputs(results, *long, *all)
+	outputs := prepareOutputs(results, *longFlag, *allFlag)
 
 	// Handle multiple output formats
 	outputFormats := []struct {
@@ -311,6 +249,107 @@ func main() {
 	}
 }
 
+// processInputs handles the input processing and returns the status codes to display
+func processInputs(codeStr, searchStr string, args []string) []StatusCode {
+	var results []StatusCode
+	seen := make(map[int]bool) // Track seen codes to prevent duplicates
+
+	// Helper to add status code if not seen
+	addIfNotSeen := func(sc StatusCode) {
+		if !seen[sc.Code] {
+			seen[sc.Code] = true
+			results = append(results, sc)
+		}
+	}
+
+	// Process code flag (comma-separated)
+	if codeStr != "" {
+		parts := strings.Split(codeStr, ",")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+
+			// Try to parse as exact code
+			if codeInt, err := strconv.Atoi(part); err == nil {
+				if sc, found := findStatusCode(codeInt); found {
+					addIfNotSeen(sc)
+					continue
+				}
+			}
+
+			// Handle partial code match
+			var matches []StatusCode
+			for _, sc := range statusCodes {
+				codeStr := strconv.Itoa(sc.Code)
+				if strings.HasPrefix(codeStr, part) {
+					matches = append(matches, sc)
+				}
+			}
+			if len(matches) == 0 {
+				log.Fatalf("No HTTP status codes found matching: '%s'", part)
+			}
+			for _, sc := range matches {
+				addIfNotSeen(sc)
+			}
+		}
+	}
+
+	// Process positional arguments (comma-separated or single)
+	if len(args) > 0 {
+		for _, arg := range args {
+			argParts := strings.Split(arg, ",")
+			for _, part := range argParts {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+
+				// Try to parse as exact code
+				if codeInt, err := strconv.Atoi(part); err == nil {
+					if sc, found := findStatusCode(codeInt); found {
+						addIfNotSeen(sc)
+						continue
+					}
+				}
+
+				// Handle partial code match
+				var matches []StatusCode
+				for _, sc := range statusCodes {
+					codeStr := strconv.Itoa(sc.Code)
+					if strings.HasPrefix(codeStr, part) {
+						matches = append(matches, sc)
+					}
+				}
+				if len(matches) == 0 {
+					log.Fatalf("No HTTP status codes found matching: '%s'", part)
+				}
+				for _, sc := range matches {
+					addIfNotSeen(sc)
+				}
+			}
+		}
+	}
+
+	// Process search
+	if searchStr != "" {
+		searchResults := searchStatusCodes(searchStr)
+		for _, sc := range searchResults {
+			addIfNotSeen(sc)
+		}
+	}
+
+	// If no filters applied, show all codes
+	if codeStr == "" && len(args) == 0 && searchStr == "" {
+		results = statusCodes
+	} else if len(results) == 0 {
+		log.Fatal("No HTTP status codes found matching your criteria")
+	}
+
+	return results
+}
+
 func printHelp() {
 	fmt.Printf("%s %s\n\n", AppName, AppVersion)
 	fmt.Println("A CLI tool for looking up HTTP status codes with multiple output formats")
@@ -319,52 +358,45 @@ func printHelp() {
 	fmt.Println("USAGE:")
 	fmt.Println("  httpstatus [flags] [status_code|partial_code]")
 	fmt.Println("  httpstatus --search \"search term\"")
-	fmt.Println("  httpstatus --code 404")
-	fmt.Println("  httpstatus 200 --json-pretty")
-	fmt.Println("  httpstatus --to-file http_codes --json-pretty --yaml")
+	fmt.Println("  httpstatus --code \"200,404\"")
+	fmt.Println("  httpstatus \"4,5\" --json-pretty")
+	fmt.Println("  httpstatus --to-file output --json --csv")
 	fmt.Println("  httpstatus --table  # Show all codes in table format")
 	fmt.Println("\nFLAGS:")
-	fmt.Println("  -c, --code <number>     HTTP status code to look up (omit for all codes)")
-	fmt.Println("  -s, --search <term>     Search status codes by keyword")
-	fmt.Println("  -l, --long              Show long description only")
-	fmt.Println("  -a, --all               Show both short and long descriptions")
-	fmt.Println("  --json                  Output as JSON")
-	fmt.Println("  --json-pretty           Output as formatted JSON")
-	fmt.Println("  --xml                   Output as XML")
-	fmt.Println("  --xml-pretty            Output as formatted XML")
-	fmt.Println("  --yaml                  Output as YAML")
-	fmt.Println("  --yaml-pretty           Output as formatted YAML")
-	fmt.Println("  --toml                  Output as TOML")
-	fmt.Println("  --table                 Output as text table")
-	fmt.Println("  --markdown              Output as Markdown table")
-	fmt.Println("  --csv                   Output as CSV")
-	fmt.Println("  --to-file <base>        Save output to files with base name (automatic extensions)")
-	fmt.Println("  --help                  Show this help message")
-	fmt.Println("  --version               Show version information")
+	fmt.Println("  -c, --code <codes>   HTTP status code(s) to look up (comma-separated)")
+	fmt.Println("  -s, --search <term>  Search status codes by keyword")
+	fmt.Println("  -l, --long           Show long description only")
+	fmt.Println("  -a, --all            Show both short and long descriptions")
+	fmt.Println("  --json               Output as JSON")
+	fmt.Println("  --json-pretty        Output as formatted JSON")
+	fmt.Println("  --xml                Output as XML")
+	fmt.Println("  --xml-pretty         Output as formatted XML")
+	fmt.Println("  --yaml               Output as YAML")
+	fmt.Println("  --yaml-pretty        Output as formatted YAML")
+	fmt.Println("  --toml               Output as TOML")
+	fmt.Println("  --table              Output as text table")
+	fmt.Println("  --markdown           Output as Markdown table")
+	fmt.Println("  --csv                Output as CSV")
+	fmt.Println("  --to-file <base>     Save output to files with base name (automatic extensions)")
+	fmt.Println("  --help               Show this help message")
+	fmt.Println("  --version            Show version information")
 
 	fmt.Println("\nEXAMPLES:")
-	fmt.Println("  Look up status code 404:")
-	fmt.Println("      httpstatus -c 404")
-	fmt.Println("  Show all HTTP status codes in table format:")
-	fmt.Println("      httpstatus --table")
-	fmt.Println("  Look up all 4xx codes (client errors):")
-	fmt.Println("      httpstatus 4")
-	fmt.Println("  Look up all 41x codes:")
-	fmt.Println("      httpstatus 41")
-	fmt.Println("  Search for 'not found':")
-	fmt.Println("      httpstatus --search \"not found\"")
-	fmt.Println("  Get status 200 in JSON format:")
-	fmt.Println("      httpstatus 200 --json")
-	fmt.Println("  Get all details for status 500:")
-	fmt.Println("      httpstatus 500 --all")
-	fmt.Println("  Export all codes to JSON and YAML files:")
-	fmt.Println("      httpstatus --to-file http_codes --json-pretty --yaml")
-	fmt.Println("  Export search results to CSV:")
-	fmt.Println("      httpstatus --search \"error\" --csv --to-file errors")
+	fmt.Println("  Look up multiple status codes:")
+	fmt.Println("      httpstatus -c \"200,404\"")
+	fmt.Println("  Look up all 4xx and 5xx codes:")
+	fmt.Println("      httpstatus \"4,5\"")
+	fmt.Println("  Search for 'not found' and show 404:")
+	fmt.Println("      httpstatus --search \"not found\" --code 404")
+	fmt.Println("  Get status 200 and 201 in JSON format:")
+	fmt.Println("      httpstatus 200,201 --json")
+	fmt.Println("  Export all 2xx codes to CSV:")
+	fmt.Println("      httpstatus 2 --csv --to-file success_codes")
 
 	fmt.Println("\nPARTIAL CODE LOOKUP:")
 	fmt.Println("  You can enter just the first digit (e.g., '4') or first two digits (e.g., '41')")
 	fmt.Println("  to list all HTTP status codes in that set. This is separate from --search.")
+	fmt.Println("  Multiple partial codes can be combined with commas: '4,5' shows all client and server errors")
 
 	fmt.Println("\nFILE OUTPUT:")
 	fmt.Println("  Use --to-file with a base filename to save output to files. The tool will automatically")

@@ -432,18 +432,123 @@ func TestPrintTextWithNil(t *testing.T) {
 	printText(&buf, codes)
 	output := buf.String()
 
-	// Should contain only code and type for test code
-	if !strings.Contains(output, "Code: 999") || !strings.Contains(output, "Type: Test") {
+	// Split output by code sections
+	sections := strings.Split(output, "---")
+	if len(sections) < 2 {
+		t.Fatalf("Expected at least 2 sections, got %d", len(sections))
+	}
+
+	// Section 1: Test code (999)
+	section1 := sections[0]
+	if !strings.Contains(section1, "Code: 999") || !strings.Contains(section1, "Type: Test") {
 		t.Error("Output missing test code status")
 	}
-
-	// Should not contain "Short:" or "Long:" for test code
-	if strings.Contains(output, "Short:") || strings.Contains(output, "Long:") {
-		t.Error("Output should not contain short/long for test code")
+	if strings.Contains(section1, "Short:") || strings.Contains(section1, "Long:") {
+		t.Error("Test code section should not contain short/long headers")
 	}
 
-	// Should contain both for 404
-	if !strings.Contains(output, "Short: Not Found") || !strings.Contains(output, "Long: Resource not found") {
-		t.Error("Output missing 404 details")
+	// Section 2: 404 code
+	section2 := sections[1]
+	if !strings.Contains(section2, "Short: Not Found") || !strings.Contains(section2, "Long: Resource not found") {
+		t.Error("404 section missing expected details")
+	}
+}
+
+// Test multi-code input
+func TestMultiCodeInput(t *testing.T) {
+	results := processInputs("200,404", "", nil)
+
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 codes, got %d", len(results))
+	}
+	found200 := false
+	found404 := false
+	for _, r := range results {
+		if r.Code == 200 {
+			found200 = true
+		}
+		if r.Code == 404 {
+			found404 = true
+		}
+	}
+	if !found200 || !found404 {
+		t.Errorf("Missing expected codes: found200=%v, found404=%v", found200, found404)
+	}
+}
+
+// Test combined search and codes
+func TestCombinedSearchAndCodes(t *testing.T) {
+	results := processInputs("404", "teapot", nil)
+
+	if len(results) < 2 {
+		t.Fatalf("Expected at least 2 codes, got %d", len(results))
+	}
+	found404 := false
+	found418 := false
+	for _, r := range results {
+		if r.Code == 404 {
+			found404 = true
+		}
+		if r.Code == 418 {
+			found418 = true
+		}
+	}
+	if !found404 || !found418 {
+		t.Errorf("Missing expected codes: found404=%v, found418=%v", found404, found418)
+	}
+}
+
+// Test partial code input
+func TestPartialCodeInput(t *testing.T) {
+	results := processInputs("4,5", "", nil)
+
+	// Count 4xx and 5xx codes
+	count4xx := 0
+	count5xx := 0
+	for _, r := range results {
+		if r.Code >= 400 && r.Code < 500 {
+			count4xx++
+		} else if r.Code >= 500 && r.Code < 600 {
+			count5xx++
+		}
+	}
+
+	if count4xx == 0 || count5xx == 0 {
+		t.Errorf("Expected both 4xx and 5xx codes, got 4xx=%d, 5xx=%d", count4xx, count5xx)
+	}
+}
+
+// Test duplicate prevention
+func TestDuplicatePrevention(t *testing.T) {
+	results := processInputs("404,404,4", "", nil)
+
+	// Verify no duplicates
+	codes := make(map[int]bool)
+	for _, r := range results {
+		if codes[r.Code] {
+			t.Errorf("Duplicate found for code %d", r.Code)
+		}
+		codes[r.Code] = true
+	}
+}
+
+// Test invalid code input
+func TestInvalidCodeInput(t *testing.T) {
+	// Should log fatal
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected fatal error for invalid code input")
+		}
+	}()
+
+	processInputs("abc", "", nil)
+}
+
+// Test empty input
+func TestEmptyInput(t *testing.T) {
+	results := processInputs("", "", nil)
+
+	if len(results) != len(statusCodes) {
+		t.Errorf("Expected all codes, got %d instead of %d", len(results), len(statusCodes))
 	}
 }
