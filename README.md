@@ -1,9 +1,19 @@
 # httpstatus - HTTP Status Code Lookup Tool
 
-[![License: GPL
-v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub
-release](https://img.shields.io/github/release/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/releases/latest)
+[![Release Version](https://img.shields.io/github/v/release/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/releases)
+[![Build Status](https://github.com/yodanator/httpstatus/actions/workflows/release.yml/badge.svg)](https://github.com/yodanator/httpstatus/actions/workflows/release.yml)
+[![Forks](https://img.shields.io/github/forks/yodanator/httpstatus?style=social)](https://github.com/yodanator/httpstatus/network/members)
+[![Stars](https://img.shields.io/github/stars/yodanator/httpstatus?style=social)](https://github.com/yodanator/httpstatus/stargazers)
+[![Pull Requests](https://img.shields.io/github/issues-pr/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/pulls)
+[![Issues](https://img.shields.io/github/issues/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/issues)
+[![License](https://img.shields.io/github/license/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/blob/main/LICENSE)
+[![Codecov](https://codecov.io/gh/yodanator/httpstatus/branch/main/graph/badge.svg)](https://codecov.io/gh/yodanator/httpstatus)
+[![Coveralls](https://coveralls.io/repos/github/yodanator/httpstatus/badge.svg?branch=main)](https://coveralls.io/github/yodanator/httpstatus?branch=main)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/yodanator/httpstatus/latest/total)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/yodanator/httpstatus/total)
+
+
+
 
 A CLI tool for looking up HTTP status codes with multiple output
 formats. Instantly get detailed information about any HTTP status code

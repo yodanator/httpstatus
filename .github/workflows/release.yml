@@ -3,7 +3,6 @@ name: Release Build
 on:
   push:
     tags: ['[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]']
-
   workflow_dispatch:
     inputs:
       tag:
@@ -13,7 +12,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: ${{ github.workspace }}
@@ -55,20 +53,26 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        ref: ${{ github.ref }} 
-      
+        ref: ${{ github.ref }}
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.22'
-    
+
     - name: Run tests with coverage
-      run: go test -v -cover ./...
+      run: |
+        go test -v -coverprofile=coverage.out ./...
+        go tool cover -func=coverage.out > coverage.txt
+        go tool cover -html=coverage.out -o coverage.html
+        mkdir -p coverage
+        mv coverage.out coverage.txt coverage.html coverage/
+
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y upx
-        
+        sudo apt install -y upx zip
+
     - name: Build binary
       env:
         GOOS: ${{ matrix.platform.os }}
@@ -81,9 +85,9 @@ jobs:
         if [ "$GOOS" = "windows" ]; then
           BINARY_NAME="$BINARY_NAME.exe"
         fi
-        
+
         CGO_ENABLED=0 go build -trimpath -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w" -o "$OUTPUT_DIR/$BINARY_NAME"
-        
+
         if [[ "$GOOS" == "darwin" || \
               "$GOOS" == "freebsd" || \
               "$GOARCH" == "arm" || \
@@ -93,7 +97,7 @@ jobs:
         else
           upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
         fi
-        
+
     - name: Package release
       run: |
         VERSION=${GITHUB_REF_NAME}
@@ -104,9 +108,9 @@ jobs:
         if [ -z "$SUFFIX" ]; then
           SUFFIX="$ARCH"
         fi
-        
+
         ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
-        
+
         cd dist
         if [ "$(ls -A)" ]; then
           if [ "$OS" = "windows" ]; then
@@ -121,43 +125,57 @@ jobs:
         cd ..
         mkdir -p artifacts
         mv "$ARCHIVE_NAME".* artifacts/
-        
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: httpstatus-binaries-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
         path: artifacts
 
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
+        path: coverage
+
   create-release:
     runs-on: ubuntu-latest
     needs: build
     permissions:
-      contents: write 
+      contents: write
 
     steps:
-    - name: Download artifacts
+    - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
         path: dist-binaries
-        
+
+    - name: Download coverage reports
+      uses: actions/download-artifact@v4
+      with:
+        path: dist-coverage
+
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Prepare release assets
       run: |
         mkdir -p release-assets
+        # Move all build artifacts
         find dist-binaries -type f -exec mv -t release-assets {} +
+        # Move all coverage reports
+        find dist-coverage -type f -exec mv -t release-assets {} +
 
-        # Generate installation scripts
+        # ---- Generate install.sh ----
         cat << 'EOF' > install.sh
         #!/bin/bash
         set -e
-        
+
         REPO="yodanator/httpstatus"
         LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         INSTALL_DIR=""
         SUDO_CMD=""
-        
+
         while [[ $# -gt 0 ]]; do
           case "$1" in
             --system-wide)
@@ -174,20 +192,20 @@ jobs:
           esac
           shift
         done
-        
+
         if [ -z "$INSTALL_DIR" ]; then
           echo "Please specify installation type:"
           echo "  ./install.sh --user    # Install to user's bin directory (~/bin)"
           echo "  ./install.sh --system-wide   # Install system-wide (requires sudo)"
           exit 1
         fi
-        
+
         $SUDO_CMD mkdir -p "$INSTALL_DIR"
-        
+
         OS=$(uname -s | tr '[:upper:]' '[:lower:]')
         ARCH=$(uname -m)
         SUFFIX=""
-        
+
         case "$ARCH" in
           x86_64) ARCH="amd64" ;;
           i386|i686) ARCH="386" ;;
@@ -195,60 +213,59 @@ jobs:
           armv7l) ARCH="arm" ; SUFFIX="v7" ;;
           aarch64) ARCH="arm64" ;;
         esac
-        
+
         if [[ "$OS" == *"windows"* || "$OS" == *"msys"* || "$OS" == *"cygwin"* ]]; then
           OS="windows"
           if [ "$PROCESSOR_ARCHITECTURE" = "ARM64" ] || [ "$PROCESSOR_ARCHITEW6432" = "ARM64" ]; then
             ARCH="arm64"
           fi
         fi
-        
+
         FILENAME="httpstatus-${OS}-${ARCH}"
         if [ -n "$SUFFIX" ]; then
           FILENAME="${FILENAME}-${SUFFIX}"
         fi
         FILENAME="${FILENAME}-v${LATEST_RELEASE}"
-        
+
         EXT=".tar.gz"
         if [ "$OS" = "windows" ]; then
           EXT=".zip"
         fi
-        
+
         URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$FILENAME$EXT"
         echo "Downloading: $URL"
         curl -L -O "$URL"
-        
+
         echo "Verifying checksum..."
         curl -L -O "https://github.com/$REPO/releases/download/$LATEST_RELEASE/SHA256SUMS"
         sha256sum --ignore-missing -c SHA256SUMS
-        
+
         echo "Installing to $INSTALL_DIR..."
         if [ "$OS" = "windows" ]; then
           unzip -j "$FILENAME$EXT" -d "$INSTALL_DIR"
         else
           tar -xzf "$FILENAME$EXT" -C "$INSTALL_DIR"
         fi
-        
+
         echo "Cleaning up..."
         rm -f "$FILENAME$EXT" SHA256SUMS
         echo "httpstatus $LATEST_RELEASE installed successfully!"
         EOF
 
-        # Generate Windows install script
+        # ---- Generate install.bat ----
         cat << 'EOF' > install.bat
         @echo off
         setlocal enabledelayedexpansion
-        
+
         set REPO=yodanator/httpstatus
         for /f "tokens=*" %%a in ('curl -s "https://api.github.com/repos/%REPO%/releases/latest" ^| findstr "tag_name"') do (
           set TAG=%%a
         )
         set TAG=!TAG:*"tag_name": "=!
         set TAG=!TAG:~0,-2!
-        
         set INSTALL_DIR=""
         set SUDO_CMD=""
-        
+
         :parse_args
         if "%~1"=="" goto endparse
         if "%~1"=="--system" (
@@ -261,52 +278,52 @@ jobs:
         shift
         goto parse_args
         :endparse
-        
+
         if "!INSTALL_DIR!"=="" (
           echo Please specify installation type:
           echo   install.bat --user    ^> Install to user's bin directory
           echo   install.bat --system  ^> Install system-wide
           exit /b 1
         )
-        
+
         echo Detecting platform...
         set OS=windows
         set ARCH=%PROCESSOR_ARCHITECTURE%
         if "%ARCH%"=="AMD64" set ARCH=amd64
         if "%ARCH%"=="x86" set ARCH=386
-        
+
         if "%PROCESSOR_ARCHITEW6432%"=="ARM64" set ARCH=arm64
         if "%PROCESSOR_ARCHITECTURE%"=="ARM64" set ARCH=arm64
-        
+
         set FILENAME=httpstatus-windows-!ARCH!-v!TAG!.zip
-        
+
         echo Downloading: https://github.com/%REPO%/releases/download/!TAG!/!FILENAME!
         curl -L -o "!FILENAME!" "https://github.com/%REPO%/releases/download/!TAG!/!FILENAME!"
-        
+
         echo Verifying checksum...
         curl -L -o SHA256SUMS "https://github.com/%REPO%/releases/download/!TAG!/SHA256SUMS"
         certutil -hashfile "!FILENAME!" SHA256 | findstr /v "hash" > hash.tmp
         set /p ACTUAL_HASH=<hash.tmp
         for /f "tokens=1" %%a in ('findstr "!FILENAME!" SHA256SUMS') do set EXPECTED_HASH=%%a
-        
+
         if not "!ACTUAL_HASH!"=="!EXPECTED_HASH!" (
           echo ERROR: Checksum verification failed!
           echo Expected: !EXPECTED_HASH!
           echo Actual:   !ACTUAL_HASH!
           exit /b 1
         )
-        
+
         echo Installing to !INSTALL_DIR!...
         if not exist "!INSTALL_DIR!" mkdir "!INSTALL_DIR!"
         powershell -command "Expand-Archive -Path '!FILENAME!' -DestinationPath '!INSTALL_DIR!' -Force"
-        
+
         echo Cleaning up...
         del "!FILENAME!" SHA256SUMS hash.tmp
         echo httpstatus !TAG! installed successfully!
         endlocal
         EOF
-        
-        # Generate PowerShell install script
+
+        # ---- Generate install.ps1 ----
         cat << 'EOF' > install.ps1
         [CmdletBinding()]
         param(
@@ -362,48 +379,51 @@ jobs:
 
         Write-Host "httpstatus $version installed to $installDir"
         EOF
-        
+
         chmod +x install.sh
         mv install.sh install.bat install.ps1 release-assets/
-        
+
         cd release-assets
         sha256sum * > SHA256SUMS
         cd ..
-        
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
+
+    - name: Create Release & Upload Assets
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.ref }}
         name: Release ${{ github.ref_name }}
-        files: |
-          release-assets/*
+        draft: false
+        prerelease: false
         body: |
           Pre-built binaries for HTTP Status CLI v${{ github.ref_name }}
-          
+
           ### Installation Options
           1. **Go Install**:
           ```bash
           # User-level installation (default: $HOME/go/bin)
           go install github.com/yodanator/httpstatus@${{ github.ref_name }}
-          
+
           # System-wide installation (Unix)
           sudo GOBIN=/usr/local/bin go install github.com/yodanator/httpstatus@${{ github.ref_name }}
-          
+
           # System-wide installation (Windows - Run in Admin PowerShell)
           $env:GOBIN = "C:\Program Files\httpstatus"
           go install github.com/yodanator/httpstatus@${{ github.ref_name }}
           ```
-          
+
           2. **Install Scripts**:
           - Linux/macOS: `./install.sh --user` or `sudo ./install.sh --system-wide`
           - Windows: `.\install.bat --user` or `.\install.ps1 -System` (Admin)
-          
+
           ### Verification
           Verify downloaded files with:
           ```bash
           sha256sum -c SHA256SUMS
           ```
-          
+
+          ### Coverage Reports
+          Download and view `coverage.html` or `coverage.txt` for each platform/arch build.
+
           ### Supported Platforms
           - macOS (Intel and Apple Silicon)
           - Linux (x86-32, x86-64, ARMv6, ARMv7, ARM64)
@@ -411,3 +431,4 @@ jobs:
           - FreeBSD (x86-64)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      files: release-assets/*
