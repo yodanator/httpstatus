@@ -2,7 +2,17 @@ name: Dev CI Build & Test
 
 on:
   push:
+<<<<<<< HEAD
     branches: [dev]
+=======
+    branches:
+      - dev
+    tags:
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-dev'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+>>>>>>> dev
 
 jobs:
   build:
