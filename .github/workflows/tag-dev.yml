@@ -22,7 +22,7 @@ jobs:
 
       - name: Configure git to use GH_TOKEN for push
         run: |
-          git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git
+          git remote set-url origin https://x-access-token:${{ secrets.GH_REPO }}@github.com/${{ github.repository }}.git
 
       - name: Create and push dev tag
         run: |
