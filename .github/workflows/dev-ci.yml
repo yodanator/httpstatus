@@ -1,0 +1,126 @@
+name: Dev CI Build & Test
+
+on:
+  push:
+    branches:
+      - dev
+    tags:
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-dev'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    strategy:
+      matrix:
+        platform:
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: 386
+          - os: linux
+            arch: arm
+            goarm: 6
+            suffix: v6
+          - os: linux
+            arch: arm
+            goarm: 7
+            suffix: v7
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: amd64
+          - os: windows
+            arch: 386
+          - os: windows
+            arch: arm64
+          - os: freebsd
+            arch: amd64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Run tests with coverage
+      run: |
+        go test -v -coverprofile=coverage.out ./...
+        go tool cover -func=coverage.out > coverage.txt
+        go tool cover -html=coverage.out -o coverage.html
+        mkdir -p coverage
+        mv coverage.out coverage.txt coverage.html coverage/
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y upx zip
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.platform.os }}
+        GOARCH: ${{ matrix.platform.arch }}
+        GOARM: ${{ matrix.platform.goarm || '' }}
+      run: |
+        OUTPUT_DIR="dist"
+        mkdir -p $OUTPUT_DIR
+        BINARY_NAME="httpstatus"
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="$BINARY_NAME.exe"
+        fi
+        CGO_ENABLED=0 go build -trimpath -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w" -o "$OUTPUT_DIR/$BINARY_NAME"
+        if [[ "$GOOS" == "darwin" || "$GOOS" == "freebsd" || "$GOARCH" == "arm" || "$GOARCH" == "arm64" || ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
+          echo "Skipping UPX for $GOOS/$GOARCH"
+        else
+          upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
+        fi
+
+    - name: Package release
+      run: |
+        VERSION=${GITHUB_REF_NAME}
+        OS=${{ matrix.platform.os }}
+        ARCH=${{ matrix.platform.arch }}
+        GOARM=${{ matrix.platform.goarm || '' }}
+        SUFFIX="${{ matrix.platform.suffix }}"
+        if [ -z "$SUFFIX" ]; then SUFFIX="$ARCH"; fi
+        ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
+        cd dist
+        if [ "$(ls -A)" ]; then
+          if [ "$OS" = "windows" ]; then
+            zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
+          else
+            tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
+          fi
+          rm -f *
+        else
+          echo "No files to archive in dist/"
+        fi
+        cd ..
+        mkdir -p artifacts
+        mv "$ARCHIVE_NAME".* artifacts/
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dev-build-binaries-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
+        path: artifacts
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: dev-coverage-report-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
+        path: coverage

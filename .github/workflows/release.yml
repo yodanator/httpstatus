@@ -2,12 +2,9 @@ name: Release Build
 
 on:
   push:
-    tags: ['[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]']
+    tags:
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Manual tag'
-        required: true
 
 jobs:
   build:
@@ -15,9 +12,6 @@ jobs:
     defaults:
       run:
         working-directory: ${{ github.workspace }}
-    permissions:
-      packages: write
-      contents: read
     strategy:
       matrix:
         platform:
@@ -85,14 +79,8 @@ jobs:
         if [ "$GOOS" = "windows" ]; then
           BINARY_NAME="$BINARY_NAME.exe"
         fi
-
         CGO_ENABLED=0 go build -trimpath -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w" -o "$OUTPUT_DIR/$BINARY_NAME"
-
-        if [[ "$GOOS" == "darwin" || \
-              "$GOOS" == "freebsd" || \
-              "$GOARCH" == "arm" || \
-              "$GOARCH" == "arm64" || \
-              ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
+        if [[ "$GOOS" == "darwin" || "$GOOS" == "freebsd" || "$GOARCH" == "arm" || "$GOARCH" == "arm64" || ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
           echo "Skipping UPX for $GOOS/$GOARCH"
         else
           upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
@@ -105,12 +93,8 @@ jobs:
         ARCH=${{ matrix.platform.arch }}
         GOARM=${{ matrix.platform.goarm || '' }}
         SUFFIX="${{ matrix.platform.suffix }}"
-        if [ -z "$SUFFIX" ]; then
-          SUFFIX="$ARCH"
-        fi
-
+        if [ -z "$SUFFIX" ]; then SUFFIX="$ARCH"; fi
         ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
-
         cd dist
         if [ "$(ls -A)" ]; then
           if [ "$OS" = "windows" ]; then
@@ -141,8 +125,6 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     needs: build
-    permissions:
-      contents: write
 
     steps:
     - name: Download build artifacts
@@ -161,9 +143,7 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir -p release-assets
-        # Move all build artifacts
         find dist-binaries -type f -exec mv -t release-assets {} +
-        # Move all coverage reports
         find dist-coverage -type f -exec mv -t release-assets {} +
 
         # ---- Generate install.sh ----
