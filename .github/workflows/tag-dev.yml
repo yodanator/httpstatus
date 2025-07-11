@@ -11,16 +11,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: dev
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_TOKEN }}
+
       - name: Generate date+time-based tag (dot between min/sec)
         id: tag
         run: |
           TAG=$(date +'%Y.%m.%d-%H%M.%S-dev')
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-      - name: Configure git to use GITHUB_TOKEN for push
+
+      - name: Configure git to use GH_TOKEN for push
         run: |
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git
+
       - name: Create and push dev tag
         run: |
           git config user.name "github-actions"
