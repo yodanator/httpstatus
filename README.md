@@ -1,7 +1,8 @@
 # httpstatus - HTTP Status Code Lookup Tool
 
 [![Release Version](https://img.shields.io/github/v/release/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/releases)
-[![Build Status](https://github.com/yodanator/httpstatus/actions/workflows/release.yml/badge.svg)](https://github.com/yodanator/httpstatus/actions/workflows/release.yml)
+[![Build Status - main](https://github.com/yodanator/httpstatus/actions/workflows/release.yml/badge.svg)](https://github.com/yodanator/httpstatus/actions/workflows/release.yml)
+[![Dev CI Build - dev](https://github.com/yodanator/httpstatus/actions/workflows/dev-ci.yml/badge.svg?branch=dev)](https://github.com/yodanator/httpstatus/actions/workflows/dev-ci.yml)
 [![Forks](https://img.shields.io/github/forks/yodanator/httpstatus?style=social)](https://github.com/yodanator/httpstatus/network/members)
 [![Stars](https://img.shields.io/github/stars/yodanator/httpstatus?style=social)](https://github.com/yodanator/httpstatus/stargazers)
 [![Pull Requests](https://img.shields.io/github/issues-pr/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/pulls)
