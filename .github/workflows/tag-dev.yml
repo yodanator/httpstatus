@@ -11,6 +11,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: dev
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate date+time-based tag (dot between min/sec)
         id: tag
         run: |
