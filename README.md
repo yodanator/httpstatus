@@ -1,61 +1,187 @@
-# httpstatus
+# httpstatus - HTTP Status Code Lookup Tool
 
-A CLI tool for looking up HTTP status codes in multiple formats.
+[![License: GPL
+v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![GitHub
+release](https://img.shields.io/github/release/yodanator/httpstatus)](https://github.com/yodanator/httpstatus/releases/latest)
 
----
+A CLI tool for looking up HTTP status codes with multiple output
+formats. Instantly get detailed information about any HTTP status code
+directly from your terminal.
 
-## Overview
+------------------------------------------------------------------------
 
-**httpstatus** is a command-line utility that allows you to quickly look up HTTP status codes, their types, and their descriptions. It supports searching by code, partial code, or keyword and can output results in plain text, JSON, XML, or YAML formats (including pretty-printed versions).
+## Features
 
----
+- Look up status codes by number (e.g., `404`) or category (e.g., `4`)
+- Search descriptions with keywords (e.g., `not found`)
+- Multiple output formats: JSON, XML, YAML, TOML, CSV, Markdown
+- Save output to files
+- Cross-platform support (Windows, Linux, macOS, FreeBSD)
+- Multiple installation options
+
+------------------------------------------------------------------------
+
+## Installation
+
+### Using Install Scripts (Recommended)
+
+1.  Download the appropriate install script from the [latest
+    release](https://github.com/yodanator/httpstatus/releases/latest):
+    - `install.sh` for Linux/macOS
+    - `install.bat` for Windows Command Prompt
+    - `install.ps1` for Windows PowerShell
+2.  Run the script with your preferred installation method:
+
+#### Linux/macOS
+
+    # User installation (default: ~/bin)
+    chmod +x install.sh
+    ./install.sh --user
+
+    # System-wide installation (requires sudo)
+    sudo ./install.sh --system-wide
+
+#### Windows (Command Prompt)
+
+    :: User installation (default: %USERPROFILE%\bin)
+    install.bat --user
+
+    :: System-wide installation (requires Admin)
+    install.bat --system
+
+#### Windows (PowerShell)
+
+    # User installation
+    .\install.ps1 -User
+
+    # System-wide installation (requires Admin)
+    .\install.ps1 -System
+
+------------------------------------------------------------------------
+
+### Using Go Install
+
+#### User-level installation
+
+    go install github.com/yodanator/httpstatus@latest
+
+#### System-wide installation
+
+    # Unix
+    sudo GOBIN=/usr/local/bin go install github.com/yodanator/httpstatus@latest
+
+    # Windows (Admin PowerShell)
+    $env:GOBIN = "C:\Program Files\httpstatus"
+    go install github.com/yodanator/httpstatus@latest
+
+------------------------------------------------------------------------
+
+### Manual Installation
+
+Download the appropriate binary from the latest release and add it to
+your `PATH`.
+
+------------------------------------------------------------------------
+
+### Supported Platforms
+
+| OS      | Architectures                       | Filename Pattern                       |
+|---------|-------------------------------------|----------------------------------------|
+| Linux   | x86-32, x86-64, ARMv6, ARMv7, ARM64 | `httpstatus-linux-<arch>-v<version>`   |
+| macOS   | Intel, Apple Silicon                | `httpstatus-darwin-<arch>-v<version>`  |
+| Windows | x86-32, x86-64, ARM64               | `httpstatus-windows-<arch>-v<version>` |
+| FreeBSD | x86-64                              | `httpstatus-freebsd-amd64-v<version>`  |
+
+------------------------------------------------------------------------
 
 ## Usage
 
-```sh
-httpstatus [flags] [status_code|partial_code]
-```
+    httpstatus [flags] [status_code|partial_code]
+    httpstatus --search "search term"
+    httpstatus --code "200,404"
+    httpstatus "4,5" --json-pretty
+    httpstatus --to-file output --json --csv
+    httpstatus --table
 
-### Examples
+------------------------------------------------------------------------
 
-- **Look up status code 404:**
-  ```
-  httpstatus -c 404
-  ```
-- **Look up all 4xx codes (client errors):**
-  ```
-  httpstatus 4
-  ```
-- **Look up all 41x codes:**
-  ```
-  httpstatus 41
-  ```
-- **Search for codes with "not found":**
-  ```
-  httpstatus --search "not found"
-  ```
-- **Get status 200 in JSON format:**
-  ```
-  httpstatus 200 --json
-  ```
-- **See help for all flags and output options:**
-  ```
-  httpstatus --help
-  ```
-  
-### Partial Code Lookup
+## Examples
 
-You can enter just the first digit (e.g., `4`) or first two digits (e.g., `41`) to list all HTTP status codes in that set.  
-This is separate from `--search` and is useful for quickly listing all codes in a category.
+**Look up multiple status codes:**
 
----
+    httpstatus -c "200,404"
 
-## Contributing & Feedback
+**Look up all 4xx and 5xx codes:**
 
-- **Found a missing HTTP status code?**  
-  Please [open an issue](https://github.com/yodanator/httpstatus/issues) or submit an enhancement request!
-- **Have a suggestion or improvement?**  
-  Pull requests and feature requests are welcome.
-- **Bug reports** are appreciated—please use the [issues page](https://github.com/yodanator/httpstatus/issues).
+    httpstatus "4,5"
 
----
+**Search for 'not found' and show 404:**
+
+    httpstatus --search "not found" --code 404
+
+**Get status 200 and 201 in JSON format:**
+
+    httpstatus 200,201 --json
+
+**Export all 2xx codes to CSV:**
+
+    httpstatus 2 --csv --to-file success_codes
+
+------------------------------------------------------------------------
+
+## Flags
+
+    -c, --code <codes>     HTTP status code(s) to look up (comma-separated)
+    -s, --search <term>    Search status codes by keyword
+    -l, --long             Show long description only
+    -a, --all              Show both short and long descriptions
+        --json             Output as JSON
+        --json-pretty      Output as formatted JSON
+        --xml              Output as XML
+        --xml-pretty       Output as formatted XML
+        --yaml             Output as YAML
+        --yaml-pretty      Output as formatted YAML
+        --toml             Output as TOML
+        --table            Output as text table
+        --markdown         Output as Markdown table
+        --csv              Output as CSV
+        --to-file <base>   Save output to files (automatic extensions)
+        --help             Show help message
+        --version          Show version information
+
+------------------------------------------------------------------------
+
+## Contributing
+
+1.  Fork the repository
+2.  Create a new branch: `git checkout -b feature/your-feature`
+3.  Commit your changes: `git commit -am 'Add some feature'`
+4.  Push to the branch: `git push origin feature/your-feature`
+5.  Open a pull request
+
+------------------------------------------------------------------------
+
+## Reporting Issues
+
+Open an issue on the [GitHub Issues
+page](https://github.com/yodanator/httpstatus/issues) with:
+
+- A detailed description of the issue
+- Steps to reproduce
+- Expected vs actual behavior
+- Environment details (OS, version, etc.)
+
+------------------------------------------------------------------------
+
+## License
+
+This project is licensed under the [GNU General Public License
+v3.0](https://www.gnu.org/licenses/gpl-3.0).
+
+------------------------------------------------------------------------
+
+## Support
+
+For questions or support, visit the [GitHub
+Discussions](https://github.com/yodanator/httpstatus/discussions) page.
