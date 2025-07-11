@@ -7,6 +7,14 @@ jobs:
   tag-dev:
     runs-on: ubuntu-latest
     steps:
+      - name: Check secret is set
+        run: |
+            if [ -z "${{ secrets.GH_REPO }}" ]; then
+            echo "GH_REPO secret is not available!"
+            exit 1
+            else
+            echo "GH_REPO secret is available."
+            fi
       - name: Checkout dev
         uses: actions/checkout@v4
         with:
