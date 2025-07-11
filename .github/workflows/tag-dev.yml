@@ -11,7 +11,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: dev
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_REPO }}
 
       - name: Generate date+time-based tag (dot between min/sec)
         id: tag
