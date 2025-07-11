@@ -12,10 +12,10 @@ jobs:
         with:
           ref: dev
 
-      - name: Generate date+time-based tag (to second)
+      - name: Generate date+time-based tag (dot between min/sec)
         id: tag
         run: |
-          TAG=$(date +'%Y.%m.%d-%H%M.%S)-dev'
+          TAG=$(date +'%Y.%m.%d-%H%M.%S-dev')
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
 
@@ -24,4 +24,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git tag -f "${TAG}"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push -f origin "${TAG}"
