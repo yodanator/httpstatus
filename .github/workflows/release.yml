@@ -139,7 +139,12 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir -p release-assets
-        find dist-artifacts -type f -exec mv -t release-assets {} +
+        shopt -s nullglob dotglob
+        for dir in dist-artifacts/*; do
+          if [ -d "$dir" ]; then
+            mv "$dir"/* release-assets/ 2>/dev/null || true
+          fi
+        done
 
         # ---- Generate install.sh ----
         cat << 'EOF' > install.sh
