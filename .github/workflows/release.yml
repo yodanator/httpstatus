@@ -3,7 +3,6 @@ name: Release Build
 on:
   push:
     tags:
-      # Matches YYYY.MM.DD; not full regex, so tag validation still needed in code/release scripts.
       - '[0-9][0-9][0-9][0-9].[0-1][0-9].[0-3][0-9]'
   workflow_dispatch:
 
@@ -14,9 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
     strategy:
       matrix:
         platform:
@@ -78,27 +74,36 @@ jobs:
         GOARCH: ${{ matrix.platform.arch }}
         GOARM: ${{ matrix.platform.goarm || '' }}
       run: |
-        set -euo pipefail
         OUTPUT_DIR="dist"
-        mkdir -p "$OUTPUT_DIR"
+        mkdir -p $OUTPUT_DIR
         BINARY_NAME="httpstatus"
         if [ "$GOOS" = "windows" ]; then
           BINARY_NAME="$BINARY_NAME.exe"
         fi
         CGO_ENABLED=0 go build -trimpath -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w" -o "$OUTPUT_DIR/$BINARY_NAME"
-        if [ ! -f "$OUTPUT_DIR/$BINARY_NAME" ]; then
-          echo "ERROR: Binary $BINARY_NAME was not created!"
-          exit 1
-        fi
         if [[ "$GOOS" == "darwin" || "$GOOS" == "freebsd" || "$GOARCH" == "arm" || "$GOARCH" == "arm64" || ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
           echo "Skipping UPX for $GOOS/$GOARCH"
         else
           upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
         fi
 
+    - name: Check binary exists
+      env:
+        GOOS: ${{ matrix.platform.os }}
+        GOARCH: ${{ matrix.platform.arch }}
+      run: |
+        OUTPUT_DIR="dist"
+        BINARY_NAME="httpstatus"
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="$BINARY_NAME.exe"
+        fi
+        if [ ! -f "$OUTPUT_DIR/$BINARY_NAME" ]; then
+          echo "❌ Build failed: $OUTPUT_DIR/$BINARY_NAME not found"
+          exit 1
+        fi
+
     - name: Package release
       run: |
-        set -euo pipefail
         VERSION=${GITHUB_REF_NAME}
         OS=${{ matrix.platform.os }}
         ARCH=${{ matrix.platform.arch }}
@@ -110,21 +115,12 @@ jobs:
         if [ "$(ls -A)" ]; then
           if [ "$OS" = "windows" ]; then
             zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
-            if [ ! -f "../$ARCHIVE_NAME.zip" ]; then
-              echo "ERROR: Failed to create $ARCHIVE_NAME.zip"
-              exit 1
-            fi
           else
             tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
-            if [ ! -f "../$ARCHIVE_NAME.tar.gz" ]; then
-              echo "ERROR: Failed to create $ARCHIVE_NAME.tar.gz"
-              exit 1
-            fi
           fi
           rm -f *
         else
           echo "No files to archive in dist/"
-          exit 1
         fi
         cd ..
         mkdir -p artifacts
@@ -147,13 +143,13 @@ jobs:
     needs: build
 
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
         path: dist-artifacts
-
-    - name: Checkout code
-      uses: actions/checkout@v4
 
     - name: Prepare release assets
       run: |
@@ -164,6 +160,23 @@ jobs:
             mv "$dir"/* release-assets/ 2>/dev/null || true
           fi
         done
+
+        # Verify that binaries exist for each platform, else fail
+        echo "Checking for expected binaries:"
+        MISSING=0
+        for PLATFORM in "darwin-amd64" "darwin-arm64" "linux-amd64" "linux-386" "linux-arm-v6" "linux-arm-v7" "linux-arm64" "windows-amd64" "windows-386" "windows-arm64" "freebsd-amd64"; do
+          BINARIES=( $(ls release-assets/httpstatus-$PLATFORM-v*.tar.gz 2>/dev/null || ls release-assets/httpstatus-$PLATFORM-v*.zip 2>/dev/null) )
+          if [ "${#BINARIES[@]}" -eq 0 ]; then
+            echo "❌ Missing build for $PLATFORM"
+            MISSING=1
+          else
+            echo "✅ Found: $PLATFORM"
+          fi
+        done
+        if [ "$MISSING" -eq 1 ]; then
+          echo "❌ One or more binaries missing, aborting release."
+          exit 1
+        fi
 
         # ---- Generate install.sh ----
         cat << 'EOF' > install.sh
