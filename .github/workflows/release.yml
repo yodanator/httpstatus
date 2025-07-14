@@ -3,7 +3,7 @@ name: Release Build
 on:
   push:
     tags:
-      - '[0-9]{4}.[0-9]{2}.[0-9]{2}'
+      - '[0-9]{4}\.[0-9]{2}\.[0-9]{2}'
   workflow_dispatch:
 
 jobs:
@@ -127,15 +127,10 @@ jobs:
     needs: build
 
     steps:
-    - name: Download build artifacts
+    - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
-        path: dist-binaries
-
-    - name: Download coverage reports
-      uses: actions/download-artifact@v4
-      with:
-        path: dist-coverage
+        path: dist-artifacts
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -143,8 +138,7 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir -p release-assets
-        find dist-binaries -type f -exec mv -t release-assets {} +
-        find dist-coverage -type f -exec mv -t release-assets {} +
+        find dist-artifacts -type f -exec mv -t release-assets {} +
 
         # ---- Generate install.sh ----
         cat << 'EOF' > install.sh
@@ -412,4 +406,3 @@ jobs:
         files: release-assets/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
