@@ -3,7 +3,8 @@ name: Release Build
 on:
   push:
     tags:
-      - '[0-9]{4}\.[0-9]{2}\.[0-9]{2}'
+      # Accepts tags like 2025.07.12 (Year.Month.Day)
+      - '20[0-9][0-9]\.(0[1-9]|1[0-2])\.(0[1-9]|[12][0-9]|3[01])'
   workflow_dispatch:
 
 jobs:
@@ -43,366 +44,361 @@ jobs:
             arch: amd64
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        ref: ${{ github.ref }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
 
-    - name: Run tests with coverage
-      run: |
-        go test -v -coverprofile=coverage.out ./...
-        go tool cover -func=coverage.out > coverage.txt
-        go tool cover -html=coverage.out -o coverage.html
-        mkdir -p coverage
-        mv coverage.out coverage.txt coverage.html coverage/
+      - name: Run tests with coverage
+        run: |
+          go test -v -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out > coverage.txt
+          go tool cover -html=coverage.out -o coverage.html
+          mkdir -p coverage
+          mv coverage.out coverage.txt coverage.html coverage/
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y upx zip
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y upx zip
 
-    - name: Build binary
-      env:
-        GOOS: ${{ matrix.platform.os }}
-        GOARCH: ${{ matrix.platform.arch }}
-        GOARM: ${{ matrix.platform.goarm || '' }}
-      run: |
-        OUTPUT_DIR="dist"
-        mkdir -p $OUTPUT_DIR
-        BINARY_NAME="httpstatus"
-        if [ "$GOOS" = "windows" ]; then
-          BINARY_NAME="$BINARY_NAME.exe"
-        fi
-        CGO_ENABLED=0 go build -trimpath -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w" -o "$OUTPUT_DIR/$BINARY_NAME"
-        if [[ "$GOOS" == "darwin" || "$GOOS" == "freebsd" || "$GOARCH" == "arm" || "$GOARCH" == "arm64" || ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
-          echo "Skipping UPX for $GOOS/$GOARCH"
-        else
-          upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
-        fi
-
-    - name: Package release
-      run: |
-        VERSION=${GITHUB_REF_NAME}
-        OS=${{ matrix.platform.os }}
-        ARCH=${{ matrix.platform.arch }}
-        GOARM=${{ matrix.platform.goarm || '' }}
-        SUFFIX="${{ matrix.platform.suffix }}"
-        if [ -z "$SUFFIX" ]; then SUFFIX="$ARCH"; fi
-        ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
-        cd dist
-        if [ "$(ls -A)" ]; then
-          if [ "$OS" = "windows" ]; then
-            zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
-          else
-            tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.platform.os }}
+          GOARCH: ${{ matrix.platform.arch }}
+          GOARM: ${{ matrix.platform.goarm || '' }}
+        run: |
+          OUTPUT_DIR="dist"
+          mkdir -p $OUTPUT_DIR
+          BINARY_NAME="httpstatus"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="$BINARY_NAME.exe"
           fi
-          rm -f *
-        else
-          echo "No files to archive in dist/"
-        fi
-        cd ..
-        mkdir -p artifacts
-        mv "$ARCHIVE_NAME".* artifacts/
+          CGO_ENABLED=0 go build -trimpath -ldflags="-X main.AppVersion=${GITHUB_REF_NAME#v} -X main.GitHubURL=https://github.com/${{ github.repository }} -s -w" -o "$OUTPUT_DIR/$BINARY_NAME"
+          if [[ "$GOOS" == "darwin" || "$GOOS" == "freebsd" || "$GOARCH" == "arm" || "$GOARCH" == "arm64" || ( "$GOOS" == "windows" && "$GOARCH" == "arm64" ) ]]; then
+            echo "Skipping UPX for $GOOS/$GOARCH"
+          else
+            upx --best -q "$OUTPUT_DIR/$BINARY_NAME" || true
+          fi
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: httpstatus-binaries-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
-        path: artifacts
+      - name: Package release
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          OS=${{ matrix.platform.os }}
+          ARCH=${{ matrix.platform.arch }}
+          GOARM=${{ matrix.platform.goarm || '' }}
+          SUFFIX="${{ matrix.platform.suffix }}"
+          if [ -z "$SUFFIX" ]; then SUFFIX="$ARCH"; fi
+          ARCHIVE_NAME="httpstatus-$OS-$SUFFIX-v$VERSION"
+          cd dist
+          if [ "$(ls -A)" ]; then
+            if [ "$OS" = "windows" ]; then
+              zip -j "../$ARCHIVE_NAME.zip" * > /dev/null
+            else
+              tar -czf "../$ARCHIVE_NAME.tar.gz" * > /dev/null
+            fi
+            rm -f *
+          else
+            echo "No files to archive in dist/"
+          fi
+          cd ..
+          mkdir -p artifacts
+          mv "$ARCHIVE_NAME".* artifacts/
 
-    - name: Upload coverage
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
-        path: coverage
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: httpstatus-binaries-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
+          path: artifacts
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.suffix && format('-{0}', matrix.platform.suffix) || '' }}
+          path: coverage
 
   create-release:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: dist-artifacts
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Download all artifacts (binaries and coverage)
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
 
-    - name: Prepare release assets
-      run: |
-        mkdir -p release-assets
-        find dist-artifacts -type f -exec mv -t release-assets {} +
+      - name: Debug: List artifact folders after download
+        run: |
+          echo "PWD: $(pwd)"
+          ls -lR dist-artifacts
 
-        # ---- Generate install.sh ----
-        cat << 'EOF' > install.sh
-        #!/bin/bash
-        set -e
+      - name: Prepare release assets
+        run: |
+          set -ex
+          mkdir -p release-assets
+          echo "Before moving, contents of dist-artifacts:"
+          ls -lR dist-artifacts
+          find dist-artifacts -type f -exec mv -t release-assets {} +
+          echo "After moving, contents of release-assets:"
+          ls -lR release-assets
 
-        REPO="yodanator/httpstatus"
-        LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        INSTALL_DIR=""
-        SUDO_CMD=""
+          # ---- Generate install.sh ----
+          cat << 'EOF' > install.sh
+          #!/bin/bash
+          set -e
 
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            --system-wide)
-              INSTALL_DIR="/usr/local/bin"
-              SUDO_CMD="sudo"
-              ;;
-            --user)
-              INSTALL_DIR="$HOME/bin"
-              ;;
-            *)
-              echo "Unknown option: $1"
-              exit 1
-              ;;
-          esac
-          shift
-        done
+          REPO="yodanator/httpstatus"
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          INSTALL_DIR=""
+          SUDO_CMD=""
 
-        if [ -z "$INSTALL_DIR" ]; then
-          echo "Please specify installation type:"
-          echo "  ./install.sh --user    # Install to user's bin directory (~/bin)"
-          echo "  ./install.sh --system-wide   # Install system-wide (requires sudo)"
-          exit 1
-        fi
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              --system-wide)
+                INSTALL_DIR="/usr/local/bin"
+                SUDO_CMD="sudo"
+                ;;
+              --user)
+                INSTALL_DIR="$HOME/bin"
+                ;;
+              *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+            esac
+            shift
+          done
 
-        $SUDO_CMD mkdir -p "$INSTALL_DIR"
-
-        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-        ARCH=$(uname -m)
-        SUFFIX=""
-
-        case "$ARCH" in
-          x86_64) ARCH="amd64" ;;
-          i386|i686) ARCH="386" ;;
-          armv6l) ARCH="arm" ; SUFFIX="v6" ;;
-          armv7l) ARCH="arm" ; SUFFIX="v7" ;;
-          aarch64) ARCH="arm64" ;;
-        esac
-
-        if [[ "$OS" == *"windows"* || "$OS" == *"msys"* || "$OS" == *"cygwin"* ]]; then
-          OS="windows"
-          if [ "$PROCESSOR_ARCHITECTURE" = "ARM64" ] || [ "$PROCESSOR_ARCHITEW6432" = "ARM64" ]; then
-            ARCH="arm64"
+          if [ -z "$INSTALL_DIR" ]; then
+            echo "Please specify installation type:"
+            echo "  ./install.sh --user    # Install to user's bin directory (~/bin)"
+            echo "  ./install.sh --system-wide   # Install system-wide (requires sudo)"
+            exit 1
           fi
-        fi
 
-        FILENAME="httpstatus-${OS}-${ARCH}"
-        if [ -n "$SUFFIX" ]; then
-          FILENAME="${FILENAME}-${SUFFIX}"
-        fi
-        FILENAME="${FILENAME}-v${LATEST_RELEASE}"
+          $SUDO_CMD mkdir -p "$INSTALL_DIR"
 
-        EXT=".tar.gz"
-        if [ "$OS" = "windows" ]; then
-          EXT=".zip"
-        fi
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m)
+          SUFFIX=""
 
-        URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$FILENAME$EXT"
-        echo "Downloading: $URL"
-        curl -L -O "$URL"
+          case "$ARCH" in
+            x86_64) ARCH="amd64" ;;
+            i386|i686) ARCH="386" ;;
+            armv6l) ARCH="arm" ; SUFFIX="v6" ;;
+            armv7l) ARCH="arm" ; SUFFIX="v7" ;;
+            aarch64) ARCH="arm64" ;;
+          esac
 
-        echo "Verifying checksum..."
-        curl -L -O "https://github.com/$REPO/releases/download/$LATEST_RELEASE/SHA256SUMS"
-        sha256sum --ignore-missing -c SHA256SUMS
+          if [[ "$OS" == *"windows"* || "$OS" == *"msys"* || "$OS" == *"cygwin"* ]]; then
+            OS="windows"
+            if [ "$PROCESSOR_ARCHITECTURE" = "ARM64" ] || [ "$PROCESSOR_ARCHITEW6432" = "ARM64" ]; then
+              ARCH="arm64"
+            fi
+          fi
 
-        echo "Installing to $INSTALL_DIR..."
-        if [ "$OS" = "windows" ]; then
-          unzip -j "$FILENAME$EXT" -d "$INSTALL_DIR"
-        else
-          tar -xzf "$FILENAME$EXT" -C "$INSTALL_DIR"
-        fi
+          FILENAME="httpstatus-${OS}-${ARCH}"
+          if [ -n "$SUFFIX" ]; then
+            FILENAME="${FILENAME}-${SUFFIX}"
+          fi
+          FILENAME="${FILENAME}-v${LATEST_RELEASE}"
 
-        echo "Cleaning up..."
-        rm -f "$FILENAME$EXT" SHA256SUMS
-        echo "httpstatus $LATEST_RELEASE installed successfully!"
-        EOF
+          EXT=".tar.gz"
+          if [ "$OS" = "windows" ]; then
+            EXT=".zip"
+          fi
 
-        # ---- Generate install.bat ----
-        cat << 'EOF' > install.bat
-        @echo off
-        setlocal enabledelayedexpansion
+          URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$FILENAME$EXT"
+          echo "Downloading: $URL"
+          curl -L -O "$URL"
 
-        set REPO=yodanator/httpstatus
-        for /f "tokens=*" %%a in ('curl -s "https://api.github.com/repos/%REPO%/releases/latest" ^| findstr "tag_name"') do (
-          set TAG=%%a
-        )
-        set TAG=!TAG:*"tag_name": "=!
-        set TAG=!TAG:~0,-2!
-        set INSTALL_DIR=""
-        set SUDO_CMD=""
+          echo "Verifying checksum..."
+          curl -L -O "https://github.com/$REPO/releases/download/$LATEST_RELEASE/SHA256SUMS"
+          sha256sum --ignore-missing -c SHA256SUMS
 
-        :parse_args
-        if "%~1"=="" goto endparse
-        if "%~1"=="--system" (
-          set INSTALL_DIR="%ProgramFiles%\httpstatus"
-          set SUDO_CMD=admin
-        )
-        if "%~1"=="--user" (
-          set INSTALL_DIR="%USERPROFILE%\bin"
-        )
-        shift
-        goto parse_args
-        :endparse
+          echo "Installing to $INSTALL_DIR..."
+          if [ "$OS" = "windows" ]; then
+            unzip -j "$FILENAME$EXT" -d "$INSTALL_DIR"
+          else
+            tar -xzf "$FILENAME$EXT" -C "$INSTALL_DIR"
+          fi
 
-        if "!INSTALL_DIR!"=="" (
-          echo Please specify installation type:
-          echo   install.bat --user    ^> Install to user's bin directory
-          echo   install.bat --system  ^> Install system-wide
-          exit /b 1
-        )
+          echo "Cleaning up..."
+          rm -f "$FILENAME$EXT" SHA256SUMS
+          echo "httpstatus $LATEST_RELEASE installed successfully!"
+          EOF
 
-        echo Detecting platform...
-        set OS=windows
-        set ARCH=%PROCESSOR_ARCHITECTURE%
-        if "%ARCH%"=="AMD64" set ARCH=amd64
-        if "%ARCH%"=="x86" set ARCH=386
+          # ---- Generate install.bat ----
+          cat << 'EOF' > install.bat
+          @echo off
+          setlocal enabledelayedexpansion
 
-        if "%PROCESSOR_ARCHITEW6432%"=="ARM64" set ARCH=arm64
-        if "%PROCESSOR_ARCHITECTURE%"=="ARM64" set ARCH=arm64
+          set REPO=yodanator/httpstatus
+          for /f "tokens=*" %%a in ('curl -s "https://api.github.com/repos/%REPO%/releases/latest" ^| findstr "tag_name"') do (
+            set TAG=%%a
+          )
+          set TAG=!TAG:*"tag_name": "=!
+          set TAG=!TAG:~0,-2!
+          set INSTALL_DIR=""
+          set SUDO_CMD=""
 
-        set FILENAME=httpstatus-windows-!ARCH!-v!TAG!.zip
+          :parse_args
+          if "%~1"=="" goto endparse
+          if "%~1"=="--system" (
+            set INSTALL_DIR="%ProgramFiles%\httpstatus"
+            set SUDO_CMD=admin
+          )
+          if "%~1"=="--user" (
+            set INSTALL_DIR="%USERPROFILE%\bin"
+          )
+          shift
+          goto parse_args
+          :endparse
 
-        echo Downloading: https://github.com/%REPO%/releases/download/!TAG!/!FILENAME!
-        curl -L -o "!FILENAME!" "https://github.com/%REPO%/releases/download/!TAG!/!FILENAME!"
+          if "!INSTALL_DIR!"=="" (
+            echo Please specify installation type:
+            echo   install.bat --user    ^> Install to user's bin directory
+            echo   install.bat --system  ^> Install system-wide
+            exit /b 1
+          )
 
-        echo Verifying checksum...
-        curl -L -o SHA256SUMS "https://github.com/%REPO%/releases/download/!TAG!/SHA256SUMS"
-        certutil -hashfile "!FILENAME!" SHA256 | findstr /v "hash" > hash.tmp
-        set /p ACTUAL_HASH=<hash.tmp
-        for /f "tokens=1" %%a in ('findstr "!FILENAME!" SHA256SUMS') do set EXPECTED_HASH=%%a
+          echo Detecting platform...
+          set OS=windows
+          set ARCH=%PROCESSOR_ARCHITECTURE%
+          if "%ARCH%"=="AMD64" set ARCH=amd64
+          if "%ARCH%"=="x86" set ARCH=386
 
-        if not "!ACTUAL_HASH!"=="!EXPECTED_HASH!" (
-          echo ERROR: Checksum verification failed!
-          echo Expected: !EXPECTED_HASH!
-          echo Actual:   !ACTUAL_HASH!
-          exit /b 1
-        )
+          if "%PROCESSOR_ARCHITEW6432%"=="ARM64" set ARCH=arm64
+          if "%PROCESSOR_ARCHITECTURE%"=="ARM64" set ARCH=arm64
 
-        echo Installing to !INSTALL_DIR!...
-        if not exist "!INSTALL_DIR!" mkdir "!INSTALL_DIR!"
-        powershell -command "Expand-Archive -Path '!FILENAME!' -DestinationPath '!INSTALL_DIR!' -Force"
+          set FILENAME=httpstatus-windows-!ARCH!-v!TAG!.zip
 
-        echo Cleaning up...
-        del "!FILENAME!" SHA256SUMS hash.tmp
-        echo httpstatus !TAG! installed successfully!
-        endlocal
-        EOF
+          echo Downloading: https://github.com/%REPO%/releases/download/!TAG!/!FILENAME!
+          curl -L -o "!FILENAME!" "https://github.com/%REPO%/releases/download/!TAG!/!FILENAME!"
 
-        # ---- Generate install.ps1 ----
-        cat << 'EOF' > install.ps1
-        [CmdletBinding()]
-        param(
-            [switch]$User,
-            [switch]$System
-        )
+          echo Verifying checksum...
+          curl -L -o SHA256SUMS "https://github.com/%REPO%/releases/download/!TAG!/SHA256SUMS"
+          certutil -hashfile "!FILENAME!" SHA256 | findstr /v "hash" > hash.tmp
+          set /p ACTUAL_HASH=<hash.tmp
+          for /f "tokens=1" %%a in ('findstr "!FILENAME!" SHA256SUMS') do set EXPECTED_HASH=%%a
 
-        $ErrorActionPreference = "Stop"
-        $repo = "yodanator/httpstatus"
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest"
-        $version = $release.tag_name
+          if not "!ACTUAL_HASH!"=="!EXPECTED_HASH!" (
+            echo ERROR: Checksum verification failed!
+            echo Expected: !EXPECTED_HASH!
+            echo Actual:   !ACTUAL_HASH!
+            exit /b 1
+          )
 
-        $installDir = ""
-        if ($User) { $installDir = Join-Path $env:USERPROFILE "bin" }
-        elseif ($System) { $installDir = "C:\Program Files\httpstatus" }
-        else {
-            Write-Host "Please specify installation type:"
-            Write-Host "  .\install.ps1 -User    # Install to user's bin directory"
-            Write-Host "  .\install.ps1 -System  # Install system-wide"
-            exit 1
-        }
+          echo Installing to !INSTALL_DIR!...
+          if not exist "!INSTALL_DIR!" mkdir "!INSTALL_DIR!"
+          powershell -command "Expand-Archive -Path '!FILENAME!' -DestinationPath '!INSTALL_DIR!' -Force"
 
-        if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir | Out-Null }
+          echo Cleaning up...
+          del "!FILENAME!" SHA256SUMS hash.tmp
+          echo httpstatus !TAG! installed successfully!
+          endlocal
+          EOF
 
-        $os = "windows"
-        $arch = $env:PROCESSOR_ARCHITECTURE
-        if ($env:PROCESSOR_ARCHITEW6432 -eq "ARM64") { $arch = "arm64" }
-        if ($arch -eq "AMD64") { $arch = "amd64" }
-        if ($arch -eq "x86") { $arch = "386" }
+          # ---- Generate install.ps1 ----
+          cat << 'EOF' > install.ps1
+          [CmdletBinding()]
+          param(
+              [switch]$User,
+              [switch]$System
+          )
 
-        $filename = "httpstatus-${os}-${arch}-v${version}.zip"
-        $url = "https://github.com/$repo/releases/download/$version/$filename"
+          $ErrorActionPreference = "Stop"
+          $repo = "yodanator/httpstatus"
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest"
+          $version = $release.tag_name
 
-        Write-Host "Downloading $url"
-        Invoke-WebRequest -Uri $url -OutFile $filename
+          $installDir = ""
+          if ($User) { $installDir = Join-Path $env:USERPROFILE "bin" }
+          elseif ($System) { $installDir = "C:\Program Files\httpstatus" }
+          else {
+              Write-Host "Please specify installation type:"
+              Write-Host "  .\install.ps1 -User    # Install to user's bin directory"
+              Write-Host "  .\install.ps1 -System  # Install system-wide"
+              exit 1
+          }
 
-        $checksumUrl = "https://github.com/$repo/releases/download/$version/SHA256SUMS"
-        $checksumFile = "SHA256SUMS"
-        Invoke-WebRequest -Uri $checksumUrl -OutFile $checksumFile
+          if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir | Out-Null }
 
-        $expected = (Select-String -Path $checksumFile -Pattern $filename).Line.Split()[0]
-        $actual = (Get-FileHash -Algorithm SHA256 $filename).Hash.ToLower()
+          $os = "windows"
+          $arch = $env:PROCESSOR_ARCHITECTURE
+          if ($env:PROCESSOR_ARCHITEW6432 -eq "ARM64") { $arch = "arm64" }
+          if ($arch -eq "AMD64") { $arch = "amd64" }
+          if ($arch -eq "x86") { $arch = "386" }
 
-        if ($actual -ne $expected) {
-            Write-Host "Checksum verification failed!"
-            Write-Host "Expected: $expected"
-            Write-Host "Actual:   $actual"
-            exit 1
-        }
+          $filename = "httpstatus-${os}-${arch}-v${version}.zip"
+          $url = "https://github.com/$repo/releases/download/$version/$filename"
 
-        Expand-Archive -Path $filename -DestinationPath $installDir -Force
-        Remove-Item $filename, $checksumFile
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile $filename
 
-        Write-Host "httpstatus $version installed to $installDir"
-        EOF
+          $checksumUrl = "https://github.com/$repo/releases/download/$version/SHA256SUMS"
+          $checksumFile = "SHA256SUMS"
+          Invoke-WebRequest -Uri $checksumUrl -OutFile $checksumFile
 
-        chmod +x install.sh
-        mv install.sh install.bat install.ps1 release-assets/
+          $expected = (Select-String -Path $checksumFile -Pattern $filename).Line.Split()[0]
+          $actual = (Get-FileHash -Algorithm SHA256 $filename).Hash.ToLower()
 
-        cd release-assets
-        sha256sum * > SHA256SUMS
-        cd ..
+          if ($actual -ne $expected) {
+              Write-Host "Checksum verification failed!"
+              Write-Host "Expected: $expected"
+              Write-Host "Actual:   $actual"
+              exit 1
+          }
 
-    - name: Create Release & Upload Assets
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ github.ref }}
-        name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-        body: |
-          Pre-built binaries for HTTP Status CLI v${{ github.ref_name }}
+          Expand-Archive -Path $filename -DestinationPath $installDir -Force
+          Remove-Item $filename, $checksumFile
 
-          ### Installation Options
-          1. **Go Install**:
-          ```bash
-          # User-level installation (default: $HOME/go/bin)
-          go install github.com/yodanator/httpstatus@${{ github.ref_name }}
+          Write-Host "httpstatus $version installed to $installDir"
+          EOF
 
-          # System-wide installation (Unix)
-          sudo GOBIN=/usr/local/bin go install github.com/yodanator/httpstatus@${{ github.ref_name }}
+          chmod +x install.sh
+          mv install.sh install.bat install.ps1 release-assets/
+          cd release-assets
+          sha256sum * > SHA256SUMS
+          cd ..
 
-          # System-wide installation (Windows - Run in Admin PowerShell)
-          $env:GOBIN = "C:\Program Files\httpstatus"
-          go install github.com/yodanator/httpstatus@${{ github.ref_name }}
-          ```
+      - name: Create Release & Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            Pre-built binaries for HTTP Status CLI v${{ github.ref_name }}
 
-          2. **Install Scripts**:
-          - Linux/macOS: `./install.sh --user` or `sudo ./install.sh --system-wide`
-          - Windows: `.\install.bat --user` or `.\install.ps1 -System` (Admin)
+            ### Installation Options
+            - Linux/macOS: `./install.sh --user` or `sudo ./install.sh --system-wide`
+            - Windows: `.\install.bat --user` or `.\install.ps1 -System` (Admin)
 
-          ### Verification
-          Verify downloaded files with:
-          ```bash
-          sha256sum -c SHA256SUMS
-          ```
+            ### Verification
+            Verify downloaded files with:
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
 
-          ### Coverage Reports
-          Download and view `coverage.html` or `coverage.txt` for each platform/arch build.
+            ### Coverage Reports
+            Download and view `coverage.html` or `coverage.txt` for each platform/arch build.
 
-          ### Supported Platforms
-          - macOS (Intel and Apple Silicon)
-          - Linux (x86-32, x86-64, ARMv6, ARMv7, ARM64)
-          - Windows (x86-32, x86-64, ARM64)
-          - FreeBSD (x86-64)
-        files: release-assets/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            ### Supported Platforms
+            - macOS (Intel and Apple Silicon)
+            - Linux (x86-32, x86-64, ARMv6, ARMv7, ARM64)
+            - Windows (x86-32, x86-64, ARM64)
+            - FreeBSD (x86-64)
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
