@@ -1,4 +1,4 @@
-module httpstatus
+module github.com/yodanator/httpstatus
 
 go 1.24.2
 
